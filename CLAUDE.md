@@ -78,28 +78,22 @@ After writing code, always run these checks before staging:
 If any check fails, fix the issues and re-run. Do not commit code that
 fails these checks.
 
-### Use the Code Reviewer Agent
+### Use the Project Agents
 
-After completing any non-trivial implementation, launch the `code-reviewer`
-agent to review the changes before committing. This catches:
+This project defines five custom agents in `.claude/agents/`. Use them
+as a quality gate after implementation, before committing.
 
-- Pattern inconsistencies across similar files
-- Security issues that automated tools miss
-- Architectural problems and unnecessary complexity
-
-### Agent Roles for Quality
-
-When working on a large task, think in terms of a human product team.
-Each role below maps to an agent responsibility. For complex tasks,
-run these as explicit agent passes rather than hoping a single
-implementation pass catches everything.
-
-| Role | Responsibility | When to use |
+| Agent | Role | When to use |
 |---|---|---|
-| **QA Engineer** | Run linters, tests, validate edge cases | After every implementation pass |
-| **Security Engineer** | Review for vulnerabilities, audit auth flows, run SAST | After writing auth, encryption, API, or infra code |
-| **Tech Lead** | Review for consistency, patterns, architecture | After multi-file changes or new patterns |
-| **DevOps Engineer** | Validate Docker, CI, infra-as-code, build scripts | After changing Dockerfiles, CI workflows, CDK stacks |
+| `code-reviewer` | Senior code reviewer | After any non-trivial code changes |
+| `qa-engineer` | QA validation (lint, test, scan) | Before every commit -- catches CI failures locally |
+| `security-engineer` | Security and HIPAA compliance | After changes to auth, encryption, PHI handling, infra |
+| `tech-lead` | Architecture and cross-file consistency | After multi-file changes or new patterns |
+| `devops-engineer` | Build/deploy infrastructure validation | After changes to Docker, CI, CDK, scripts, Makefile |
+
+**Minimum for every commit:** Run `qa-engineer` to validate lint/test/scan.
+**For significant changes:** Also run `code-reviewer` and the relevant
+specialist agent (`security-engineer`, `tech-lead`, or `devops-engineer`).
 
 ### Common AI Code Generation Pitfalls
 
