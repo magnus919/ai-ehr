@@ -1,0 +1,224 @@
+# OpenMedRecord
+
+An open-source, enterprise-grade Electronic Health Record (EHR) system designed for the US healthcare market. Built with HIPAA, SOC 2, and HITRUST compliance from the ground up, featuring a modern web frontend, FHIR R4 interoperability, and AWS-native infrastructure.
+
+## Architecture
+
+```
+                          ┌─────────────┐
+                          │  CloudFront  │
+                          │  (React SPA) │
+                          └──────┬───────┘
+                                 │
+                          ┌──────┴───────┐
+                          │   WAF + ALB   │
+                          └──────┬───────┘
+                                 │
+              ┌──────────────────┼──────────────────┐
+              │                  │                   │
+     ┌────────┴────────┐ ┌──────┴───────┐ ┌────────┴────────┐
+     │  Auth Service    │ │ Patient/     │ │  FHIR Gateway   │
+     │  (ECS Fargate)   │ │ Clinical API │ │  (ECS Fargate)  │
+     └────────┬────────┘ └──────┬───────┘ └────────┬────────┘
+              │                  │                   │
+              └──────────────────┼──────────────────┘
+                                 │
+           ┌─────────────────────┼─────────────────────┐
+           │                     │                      │
+  ┌────────┴────────┐  ┌────────┴────────┐  ┌─────────┴─────────┐
+  │ Aurora PostgreSQL│  │    DynamoDB     │  │  ElastiCache Redis │
+  │   (Multi-AZ)    │  │ (Audit/Sessions)│  │    (Caching)       │
+  └─────────────────┘  └─────────────────┘  └───────────────────┘
+```
+
+**Backend:** Python 3.12, FastAPI, SQLAlchemy 2.0 (async), Pydantic v2
+
+**Frontend:** React 18, TypeScript, Vite, Tailwind CSS, TanStack Query, Zustand
+
+**Infrastructure:** AWS CDK (ECS Fargate, Aurora PostgreSQL, CloudFront, WAF, KMS)
+
+## Features
+
+- **Patient Management** -- Registration, search, demographics, insurance, soft-delete
+- **Clinical Documentation** -- Encounters, SOAP notes, observations, conditions, medications
+- **CPOE / Orders** -- Lab, imaging, and referral orders with drug interaction checking
+- **Scheduling** -- Slot-based appointment booking with availability and overlap detection
+- **FHIR R4 API** -- CapabilityStatement, Patient/Observation/Condition/Encounter resources, Bundle search
+- **Multi-Tenancy** -- Schema-per-tenant isolation via PostgreSQL `search_path`
+- **Security** -- OAuth2/JWT, Argon2 password hashing, TOTP MFA, RBAC, field-level encryption (Fernet) for PHI
+- **Audit Logging** -- Immutable append-only audit trail for all PHI access
+- **Dark Mode** -- System-aware theme with manual toggle
+
+## Quick Start
+
+### Prerequisites
+
+- Docker and Docker Compose
+- Python 3.12+
+- Node.js 20+
+- Make
+
+### Setup
+
+```bash
+# Clone the repository
+git clone git@github.com:magnus919/ai-ehr.git
+cd ai-ehr
+
+# Run automated setup (creates venv, installs deps, starts services, runs migrations)
+make setup
+
+# Or start manually:
+cp .env.example .env
+make dev
+```
+
+### Development
+
+```bash
+make dev              # Start PostgreSQL, Redis, Mailpit via Docker
+make seed             # Seed database with sample data
+make test             # Run all tests with coverage
+make lint             # Run linters (ruff + eslint)
+make security-scan    # Run security scans (bandit, pip-audit, npm audit)
+```
+
+The API will be available at `http://localhost:8000` with interactive docs at `http://localhost:8000/docs`.
+
+The frontend dev server runs at `http://localhost:5173`.
+
+### All Make Targets
+
+```
+make help             # Show all available commands
+make dev              # Start local dev environment
+make dev-up           # Start all Docker services
+make dev-down         # Stop all Docker services
+make migrate          # Run database migrations
+make migrate-create   # Create a new migration
+make seed             # Seed sample data
+make db-shell         # Open psql shell
+make test             # Run all tests
+make test-unit        # Backend unit tests
+make test-integration # Backend integration tests
+make test-e2e         # End-to-end tests
+make test-frontend    # Frontend tests
+make test-docker      # Run tests in Docker
+make lint             # Run all linters
+make format           # Auto-format code
+make type-check       # TypeScript type checking
+make security-scan    # Security scans
+make build            # Build Docker images
+make build-frontend   # Build frontend for production
+make deploy-staging   # Deploy to staging (CDK)
+make deploy-prod      # Deploy to production (CDK)
+make clean            # Remove build artifacts
+make clean-all        # Full clean including node_modules and venv
+```
+
+## Project Structure
+
+```
+ai-ehr/
+├── docs/
+│   ├── requirements/PRD.md        # Product Requirements Document
+│   ├── architecture/ARCHITECTURE.md # Architectural Design Document
+│   └── compliance/COMPLIANCE.md    # Compliance Requirements & Controls
+├── src/
+│   ├── backend/
+│   │   ├── app/
+│   │   │   ├── api/routes/        # FastAPI route handlers
+│   │   │   ├── api/middleware/     # Tenant resolution, audit logging
+│   │   │   ├── core/              # Config, database, security, audit
+│   │   │   ├── models/            # SQLAlchemy ORM models
+│   │   │   ├── schemas/           # Pydantic request/response schemas
+│   │   │   ├── services/          # Business logic (auth, patient, FHIR)
+│   │   │   └── utils/             # Encryption, healthcare validators
+│   │   ├── tests/                 # pytest (unit, integration, e2e)
+│   │   ├── alembic/               # Database migrations
+│   │   └── Dockerfile
+│   └── frontend/
+│       ├── src/
+│       │   ├── components/        # React components (Auth, Patients, etc.)
+│       │   ├── pages/             # Route pages
+│       │   ├── hooks/             # TanStack Query hooks
+│       │   ├── services/          # API client layer
+│       │   ├── store/             # Zustand state stores
+│       │   └── types/             # TypeScript interfaces
+│       └── tests/                 # Vitest + Testing Library
+├── infrastructure/
+│   ├── cdk/                       # AWS CDK stacks (VPC, DB, Compute, etc.)
+│   └── docker/                    # Docker Compose (dev + test)
+├── scripts/                       # Setup, test runner, data seeding
+├── .github/workflows/             # CI/CD and security scanning
+├── Makefile
+└── .env.example
+```
+
+## API Endpoints
+
+| Route | Description |
+|---|---|
+| `POST /api/v1/auth/login` | Authenticate (returns JWT + optional MFA challenge) |
+| `POST /api/v1/auth/register` | Register new user |
+| `POST /api/v1/auth/mfa/setup` | Enable TOTP MFA |
+| `GET /api/v1/patients` | List patients (paginated, searchable) |
+| `POST /api/v1/patients` | Create patient |
+| `GET /api/v1/patients/{id}` | Get patient by ID |
+| `GET /api/v1/encounters` | List encounters |
+| `POST /api/v1/encounters` | Create encounter with observations |
+| `GET /api/v1/orders` | List orders |
+| `POST /api/v1/orders` | Create lab/imaging/referral order |
+| `GET /api/v1/appointments` | List appointments |
+| `GET /api/v1/appointments/availability` | Check available slots |
+| `GET /fhir/metadata` | FHIR CapabilityStatement |
+| `GET /fhir/Patient` | FHIR Patient search |
+| `GET /fhir/Observation` | FHIR Observation search |
+| `GET /fhir/Condition` | FHIR Condition search |
+| `GET /fhir/Encounter` | FHIR Encounter search |
+
+## Compliance
+
+This project is designed to meet the requirements of:
+
+- **HIPAA** -- Security Rule (164.312), Privacy Rule, Breach Notification
+- **SOC 2 Type II** -- All five Trust Service Criteria
+- **HITRUST CSF** -- 6 control categories, 65 security controls
+- **ONC Health IT Certification** -- 170.315 criteria
+- **21st Century Cures Act** -- Information blocking prevention, patient access APIs
+
+See [docs/compliance/COMPLIANCE.md](docs/compliance/COMPLIANCE.md) for the full control mapping.
+
+## Documentation
+
+- [Product Requirements Document](docs/requirements/PRD.md) -- 91 functional requirements, 56 non-functional requirements, 52 user stories
+- [Architecture Design Document](docs/architecture/ARCHITECTURE.md) -- System design, data model, security architecture, ADRs
+- [Compliance Requirements](docs/compliance/COMPLIANCE.md) -- HIPAA/SOC2/HITRUST/ONC control mappings
+
+## Testing
+
+The test suite includes:
+
+- **67 backend unit tests** -- Services, encryption, FHIR transforms, healthcare validators
+- **52 backend integration tests** -- API endpoints, auth flows, audit logging
+- **1 end-to-end clinical workflow test** -- Full patient intake through encounter completion
+- **36 frontend component tests** -- Patient list, login form, patient form
+- **CI/CD pipeline** -- Lint, SAST, unit/integration tests, Docker build, staging deploy, E2E
+- **Weekly security scans** -- Dependency audit, SAST, container scanning, DAST
+
+## Infrastructure
+
+AWS deployment is managed via CDK with 6 stacks:
+
+| Stack | Resources |
+|---|---|
+| VPC | 3-AZ VPC, public/private/data subnets, NAT gateways, VPC endpoints |
+| Security | KMS keys, WAF, Secrets Manager, security groups |
+| Database | Aurora PostgreSQL (Multi-AZ), DynamoDB, ElastiCache Redis |
+| Compute | ECS Fargate cluster, ALB, auto-scaling, ECR repositories |
+| Frontend | S3 + CloudFront with OAI, security headers, SPA routing |
+| Monitoring | CloudWatch dashboards/alarms, CloudTrail, SNS alerts |
+
+## License
+
+This project is open source. See [LICENSE](LICENSE) for details.
