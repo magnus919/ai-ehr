@@ -1,0 +1,119 @@
+# ===========================================================================
+# OpenMedRecord .gitignore
+# ===========================================================================
+
+# ── Python ─────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.whl
+.venv/
+venv/
+env/
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ── Node.js ────────────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+# ── IDE ────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.settings/
+.classpath
+*.sublime-project
+*.sublime-workspace
+
+# ── OS ─────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+._*
+.Spotlight-V100
+.Trashes
+
+# ── Environment / Secrets ──────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+*.pem
+*.key
+*.crt
+*.p12
+credentials.json
+service-account*.json
+secrets/
+
+# ── Docker ─────────────────────────────────────────────────────────────────
+docker-compose.override.yml
+
+# ── Testing ────────────────────────────────────────────────────────────────
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+coverage.xml
+coverage-*.xml
+*.cover
+*.lcov
+test-results*.xml
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+playwright-report/
+test-results/
+
+# ── Build / Distribution ──────────────────────────────────────────────────
+src/frontend/dist/
+src/frontend/coverage/
+*.tsbuildinfo
+
+# ── CDK / Terraform ───────────────────────────────────────────────────────
+cdk.out/
+cdk.context.json
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+.terraform.lock.hcl
+
+# ── Database ───────────────────────────────────────────────────────────────
+*.sqlite3
+*.db
+*.sql.gz
+*.dump
+
+# ── Logs ───────────────────────────────────────────────────────────────────
+logs/
+*.log
+
+# ── Misc ───────────────────────────────────────────────────────────────────
+.cache/
+tmp/
+temp/
+*.bak
+*.orig

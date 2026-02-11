@@ -1,0 +1,128 @@
+###############################################################################
+# OpenMedRecord -- Test Stack
+#
+# Ephemeral environment for running integration and e2e tests in CI.
+# All data is thrown away after the test run.
+#
+# Usage:
+#   docker compose -f docker-compose.test.yml up -d
+#   docker compose -f docker-compose.test.yml run --rm test-runner
+#   docker compose -f docker-compose.test.yml down -v
+###############################################################################
+
+name: openmedrecord-test
+
+services:
+  # ── PostgreSQL (test instance) ────────────────────────────────────────────
+  postgres-test:
+    image: postgres:15-alpine
+    container_name: omr-postgres-test
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: openmed_test
+      POSTGRES_PASSWORD: openmed_test
+      POSTGRES_DB: openmedrecord_test
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    tmpfs:
+      - /var/lib/postgresql/data  # RAM-backed for speed
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openmed_test -d openmedrecord_test"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+      start_period: 5s
+    networks:
+      - omr-test-network
+
+  # ── Redis (test instance) ─────────────────────────────────────────────────
+  redis-test:
+    image: redis:7-alpine
+    container_name: omr-redis-test
+    ports:
+      - "6380:6379"
+    command: >
+      redis-server
+        --maxmemory 64mb
+        --maxmemory-policy allkeys-lru
+        --save ""
+        --appendonly no
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+      start_period: 3s
+    networks:
+      - omr-test-network
+
+  # ── Backend Test Runner ───────────────────────────────────────────────────
+  test-runner:
+    build:
+      context: ../../src/backend
+      dockerfile: Dockerfile
+      target: testing
+    container_name: omr-test-runner
+    environment:
+      # Application
+      ENVIRONMENT: testing
+      DEBUG: "false"
+      LOG_LEVEL: WARNING
+      LOG_FORMAT: json
+
+      # Database -- points to the test PostgreSQL instance
+      DATABASE_URL: "postgresql+asyncpg://openmed_test:openmed_test@postgres-test:5432/openmedrecord_test"
+      DATABASE_POOL_SIZE: 5
+      DATABASE_MAX_OVERFLOW: 5
+
+      # Auth
+      JWT_SECRET_KEY: "test-jwt-secret-for-ci-only-never-use-in-production"
+      JWT_ALGORITHM: HS256
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: 15
+
+      # Encryption
+      FIELD_ENCRYPTION_KEY: "dGVzdC1mZXJuZXQta2V5LW5vdC1mb3ItcHJvZHVjdGlvbg=="
+
+      # Redis
+      REDIS_URL: "redis://redis-test:6379/0"
+
+      # CORS
+      CORS_ORIGINS: "http://localhost:3000"
+
+      # Test configuration
+      PYTEST_ADDOPTS: >
+        --tb=short
+        --strict-markers
+        -x
+        --cov=app
+        --cov-report=xml:/app/coverage.xml
+        --cov-report=term-missing
+        --junitxml=/app/test-results.xml
+    volumes:
+      - ../../src/backend:/app:cached
+      - test-results:/app/test-results
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+    command: >
+      sh -c "
+        echo 'Waiting for services to be fully ready...' &&
+        sleep 2 &&
+        echo 'Running database migrations...' &&
+        python -m alembic upgrade head 2>/dev/null || true &&
+        echo 'Running tests...' &&
+        python -m pytest tests/ -v
+      "
+    networks:
+      - omr-test-network
+
+volumes:
+  test-results:
+    driver: local
+
+networks:
+  omr-test-network:
+    driver: bridge
+    name: omr-test-network

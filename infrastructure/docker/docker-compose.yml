@@ -1,0 +1,164 @@
+###############################################################################
+# OpenMedRecord -- Local Development Stack
+#
+# Usage:
+#   docker compose up -d          # Start all services
+#   docker compose logs -f api    # Follow API logs
+#   docker compose down -v        # Tear down (including volumes)
+###############################################################################
+
+name: openmedrecord
+
+services:
+  # ── PostgreSQL 15 ─────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: omr-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: openmed
+      POSTGRES_PASSWORD: openmed_dev
+      POSTGRES_DB: openmedrecord
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openmed -d openmedrecord"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - omr-network
+
+  # ── Redis 7 ───────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: omr-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: >
+      redis-server
+        --maxmemory 256mb
+        --maxmemory-policy allkeys-lru
+        --appendonly yes
+        --appendfsync everysec
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - omr-network
+
+  # ── Backend API (FastAPI) ─────────────────────────────────────────────────
+  api:
+    build:
+      context: ../../src/backend
+      dockerfile: Dockerfile
+      target: development
+    container_name: omr-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Application
+      ENVIRONMENT: development
+      DEBUG: "true"
+      LOG_LEVEL: DEBUG
+      LOG_FORMAT: console
+
+      # Database
+      DATABASE_URL: "postgresql+asyncpg://openmed:openmed_dev@postgres:5432/openmedrecord"
+      DATABASE_POOL_SIZE: 5
+      DATABASE_MAX_OVERFLOW: 5
+
+      # Auth
+      JWT_SECRET_KEY: "dev-only-jwt-secret-do-not-use-in-production-12345678"
+      JWT_ALGORITHM: HS256
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: 60
+
+      # Encryption
+      FIELD_ENCRYPTION_KEY: "dev-fernet-key-not-for-production-use-000000000="
+
+      # Redis
+      REDIS_URL: "redis://redis:6379/0"
+
+      # CORS
+      CORS_ORIGINS: "http://localhost:3000,http://localhost:5173"
+
+      # MFA
+      MFA_ISSUER_NAME: "OpenMedRecord-Dev"
+    volumes:
+      - ../../src/backend:/app:cached
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - omr-network
+
+  # ── Frontend (Vite Dev Server) ────────────────────────────────────────────
+  frontend:
+    build:
+      context: ../../src/frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: omr-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      VITE_API_BASE_URL: "http://localhost:8000"
+      VITE_FHIR_BASE_URL: "http://localhost:8000/fhir"
+      VITE_ENVIRONMENT: development
+    volumes:
+      - ../../src/frontend:/app:cached
+      - /app/node_modules  # Anonymous volume to preserve container node_modules
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - omr-network
+
+  # ── Mailpit (email testing) ───────────────────────────────────────────────
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: omr-mailpit
+    restart: unless-stopped
+    ports:
+      - "8025:8025"   # Web UI
+      - "1025:1025"   # SMTP
+    networks:
+      - omr-network
+
+volumes:
+  pgdata:
+    driver: local
+  redisdata:
+    driver: local
+
+networks:
+  omr-network:
+    driver: bridge
+    name: omr-network

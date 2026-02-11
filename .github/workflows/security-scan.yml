@@ -1,0 +1,300 @@
+###############################################################################
+# OpenMedRecord -- Weekly Security Scan
+#
+# Runs comprehensive security analysis on a schedule and on-demand.
+# Covers: dependency audit, SAST, container scanning, and DAST.
+###############################################################################
+
+name: Security Scan
+
+on:
+  schedule:
+    # Every Monday at 06:00 UTC
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      scan_type:
+        description: "Type of scan to run"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - all
+          - dependency
+          - sast
+          - container
+          - dast
+
+permissions:
+  contents: read
+  security-events: write
+  issues: write
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "20"
+  AWS_REGION: us-east-1
+
+jobs:
+  # =========================================================================
+  # Dependency Audit
+  # =========================================================================
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    if: >
+      github.event.inputs.scan_type == 'all' ||
+      github.event.inputs.scan_type == 'dependency' ||
+      github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+
+      # -- Python dependencies -----------------------------------------------
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install pip-audit
+        run: pip install pip-audit==2.7.3
+
+      - name: Audit Python dependencies
+        run: >
+          pip-audit
+          --requirement src/backend/requirements.txt
+          --format json
+          --output pip-audit-report.json
+          --desc
+          || true
+
+      - name: Upload pip-audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-report
+          path: pip-audit-report.json
+
+      # -- Node.js dependencies -----------------------------------------------
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: src/frontend
+
+      - name: Audit Node.js dependencies
+        run: npm audit --json > npm-audit-report.json 2>&1 || true
+        working-directory: src/frontend
+
+      - name: Upload npm audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-report
+          path: src/frontend/npm-audit-report.json
+
+      # -- License check ------------------------------------------------------
+      - name: Check Python licenses
+        run: |
+          pip install pip-licenses==5.0.0
+          pip install -r src/backend/requirements.txt
+          pip-licenses \
+            --format=json \
+            --output-file=python-licenses.json \
+            --fail-on="GPL-3.0-only;GPL-3.0-or-later;AGPL-3.0-only;AGPL-3.0-or-later" \
+            || echo "WARNING: Found copyleft licenses in Python dependencies"
+
+      - name: Upload license report
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-reports
+          path: python-licenses.json
+
+  # =========================================================================
+  # Static Application Security Testing (SAST)
+  # =========================================================================
+  sast:
+    name: SAST
+    runs-on: ubuntu-latest
+    if: >
+      github.event.inputs.scan_type == 'all' ||
+      github.event.inputs.scan_type == 'sast' ||
+      github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      # -- Bandit (Python) ---------------------------------------------------
+      - name: Install Bandit
+        run: pip install bandit[toml]==1.8.3
+
+      - name: Run Bandit
+        run: >
+          bandit -r src/backend/app/
+          --severity-level low
+          --confidence-level low
+          --format sarif
+          --output bandit.sarif
+          || true
+
+      - name: Upload Bandit SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: bandit.sarif
+          category: bandit
+
+      # -- Semgrep -----------------------------------------------------------
+      - name: Semgrep (multi-language SAST)
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: >-
+            p/python
+            p/typescript
+            p/react
+            p/owasp-top-ten
+            p/secrets
+            p/ci
+            p/sql-injection
+            p/xss
+          generateSarif: "1"
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+      # -- Secret scanning ---------------------------------------------------
+      - name: Gitleaks (secret detection)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # =========================================================================
+  # Container Scanning
+  # =========================================================================
+  container-scan:
+    name: Container Scan
+    runs-on: ubuntu-latest
+    if: >
+      github.event.inputs.scan_type == 'all' ||
+      github.event.inputs.scan_type == 'container' ||
+      github.event_name == 'schedule'
+    strategy:
+      matrix:
+        service: [api-gateway, auth-service, fhir-gateway]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image for scanning
+        run: >
+          docker build
+          -t openmedrecord/${{ matrix.service }}:scan
+          --target production
+          --build-arg SERVICE_NAME=${{ matrix.service }}
+          -f src/backend/Dockerfile
+          src/backend
+
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: openmedrecord/${{ matrix.service }}:scan
+          format: sarif
+          output: trivy-${{ matrix.service }}.sarif
+          severity: LOW,MEDIUM,HIGH,CRITICAL
+
+      - name: Upload Trivy SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-${{ matrix.service }}.sarif
+          category: trivy-${{ matrix.service }}
+
+      - name: Trivy summary (table)
+        if: always()
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: openmedrecord/${{ matrix.service }}:scan
+          format: table
+          severity: HIGH,CRITICAL
+
+  # =========================================================================
+  # Dynamic Application Security Testing (DAST)
+  # =========================================================================
+  dast:
+    name: DAST
+    runs-on: ubuntu-latest
+    if: >
+      github.event.inputs.scan_type == 'all' ||
+      github.event.inputs.scan_type == 'dast' ||
+      github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ZAP API scan
+        uses: zaproxy/action-api-scan@v0.9.0
+        with:
+          target: https://staging.openmedrecord.health/api/v1/openapi.json
+          format: openapi
+          rules_file_name: .github/zap-rules.conf
+          cmd_options: >
+            -z "-config api.addrs.addr(0).name=staging.openmedrecord.health
+                 -config api.addrs.addr(0).enabled=true"
+          fail_action: false
+
+      - name: Upload ZAP report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: report_html.html
+
+  # =========================================================================
+  # Report Summary
+  # =========================================================================
+  report:
+    name: Generate Security Report
+    runs-on: ubuntu-latest
+    needs: [dependency-audit, sast, container-scan, dast]
+    if: always()
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create summary issue
+        if: github.event_name == 'schedule'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const date = new Date().toISOString().split('T')[0];
+            const jobs = [
+              'dependency-audit',
+              'sast',
+              'container-scan',
+              'dast'
+            ];
+
+            const results = context.payload.workflow_run
+              ? 'See workflow artifacts for detailed reports.'
+              : 'Scan completed. Check the workflow run for details.';
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Weekly Security Scan Report - ${date}`,
+              body: [
+                `## Weekly Security Scan - ${date}`,
+                '',
+                '### Scan Results',
+                '',
+                '| Scan | Status |',
+                '|------|--------|',
+                ...jobs.map(j => `| ${j} | Check workflow |`),
+                '',
+                '### Action Items',
+                '',
+                '- [ ] Review dependency audit findings',
+                '- [ ] Triage SAST alerts',
+                '- [ ] Address container vulnerabilities',
+                '- [ ] Review DAST findings',
+                '',
+                `[Workflow Run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
+              ].join('\n'),
+              labels: ['security', 'automated'],
+            });
