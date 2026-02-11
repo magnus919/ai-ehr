@@ -11,9 +11,8 @@ from __future__ import annotations
 import contextvars
 import re
 from typing import AsyncGenerator
-from uuid import uuid4
 
-from sqlalchemy import MetaData, event, text
+from sqlalchemy import MetaData, text
 from sqlalchemy.ext.asyncio import (
     AsyncAttrs,
     AsyncSession,

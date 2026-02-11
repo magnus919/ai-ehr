@@ -4,11 +4,20 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+
+if TYPE_CHECKING:
+    from app.models.condition import Condition
+    from app.models.medication import MedicationRequest
+    from app.models.observation import Observation
+    from app.models.order import Order
+    from app.models.patient import Patient
+    from app.models.user import User
 
 
 class Encounter(Base):

@@ -29,7 +29,7 @@ from app.models.condition import Condition
 from app.models.encounter import Encounter
 from app.models.observation import Observation
 from app.models.patient import Patient
-from app.schemas.fhir import Bundle, CapabilityStatement, CapabilityStatementRest
+from app.schemas.fhir import CapabilityStatement, CapabilityStatementRest
 from app.services.fhir_service import (
     build_bundle,
     condition_to_fhir,
