@@ -9,6 +9,7 @@ tenant middleware on every request.
 from __future__ import annotations
 
 import contextvars
+import re
 from typing import AsyncGenerator
 from uuid import uuid4
 
@@ -22,6 +23,16 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.orm import DeclarativeBase
 
 from app.core.config import settings
+
+_SAFE_SCHEMA_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]{0,62}$")
+
+
+def _validate_schema_name(name: str) -> str:
+    """Validate a PostgreSQL schema name to prevent SQL injection."""
+    if not _SAFE_SCHEMA_RE.match(name):
+        raise ValueError(f"Invalid schema name: {name!r}")
+    return name
+
 
 # ── Context variable that holds the current tenant schema ────────────────
 tenant_context: contextvars.ContextVar[str] = contextvars.ContextVar(
@@ -74,7 +85,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     statements are automatically scoped to the correct tenant.
     """
     async with async_session_factory() as session:
-        schema = tenant_context.get()
+        schema = _validate_schema_name(tenant_context.get())
         await session.execute(text(f"SET search_path TO {schema}, public"))
         try:
             yield session
@@ -90,7 +101,8 @@ async def create_tenant_schema(schema_name: str) -> None:
     """Create a new PostgreSQL schema for a tenant and stamp it with
     the shared table definitions."""
     async with engine.begin() as conn:
-        await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema_name}"))
+        safe_name = _validate_schema_name(schema_name)
+        await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {safe_name}"))
 
 
 async def init_db() -> None:

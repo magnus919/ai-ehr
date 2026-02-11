@@ -50,7 +50,7 @@ def _create_token(
             "type": token_type,
         }
     )
-    return jwt.encode(
+    return jwt.encode(  # nosec B105 -- key is loaded from env vars, not hardcoded
         to_encode,
         settings.JWT_SECRET_KEY,
         algorithm=settings.JWT_ALGORITHM,
@@ -88,7 +88,7 @@ def create_refresh_token(user_id: UUID, tenant_id: UUID) -> str:
 def decode_token(token: str) -> Dict[str, Any]:
     """Decode and validate a JWT.  Raises HTTPException on failure."""
     try:
-        payload = jwt.decode(
+        payload = jwt.decode(  # nosec B105 -- key is loaded from env vars, not hardcoded
             token,
             settings.JWT_SECRET_KEY,
             algorithms=[settings.JWT_ALGORITHM],

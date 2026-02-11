@@ -8,6 +8,7 @@ audit log entry.
 
 from __future__ import annotations
 
+import logging
 import time
 import uuid
 
@@ -16,8 +17,10 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from app.core.config import settings
-from app.core.database import async_session_factory, tenant_context
+from app.core.database import _validate_schema_name, async_session_factory, tenant_context
 from app.core.security import decode_token
+
+logger = logging.getLogger(__name__)
 
 # Resource paths that involve PHI and must be audit-logged
 _PHI_PREFIXES = (
@@ -63,7 +66,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         try:
             await self._write_audit(request, response, path, elapsed_ms)
         except Exception:
-            pass  # Swallow — audit failures must not affect the API response.
+            logger.exception("Failed to write audit log entry for %s %s", request.method, path)
 
         return response
 
@@ -106,7 +109,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         async with async_session_factory() as session:
             from sqlalchemy import text
 
-            schema = tenant_context.get()
+            schema = _validate_schema_name(tenant_context.get())
             await session.execute(text(f"SET search_path TO {schema}, public"))
 
             entry = AuditLog(
