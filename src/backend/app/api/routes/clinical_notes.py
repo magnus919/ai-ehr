@@ -76,7 +76,7 @@ async def list_clinical_notes(
 
     # Filter out psychotherapy notes unless user has appropriate role
     if current_user.role not in _PSYCHOTHERAPY_AUTHORIZED_ROLES:
-        stmt = stmt.where(ClinicalNote.is_psychotherapy_note == False)
+        stmt = stmt.where(ClinicalNote.is_psychotherapy_note.is_(False))
 
     if patient_id:
         stmt = stmt.where(ClinicalNote.patient_id == patient_id)

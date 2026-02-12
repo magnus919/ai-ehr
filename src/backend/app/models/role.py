@@ -4,15 +4,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
-
 from sqlalchemy import Boolean, Column as Col, DateTime, ForeignKey, String, Table, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
-
-if TYPE_CHECKING:
-    from app.models.user import User
 
 # Junction tables
 role_permissions = Table(

@@ -9,9 +9,7 @@ from __future__ import annotations
 import math
 import uuid
 from datetime import datetime
-from typing import List
-
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
