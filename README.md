@@ -1,3 +1,5 @@
+[![CI](https://github.com/magnus919/ai-ehr/actions/workflows/ci.yml/badge.svg)](https://github.com/magnus919/ai-ehr/actions/workflows/ci.yml)
+
 # OpenMedRecord
 
 > **WARNING: This is an AI-generated project.**
