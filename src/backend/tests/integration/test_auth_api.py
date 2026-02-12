@@ -25,7 +25,7 @@ class TestRegistration:
             "password": "Str0ng!P@ssword123",
             "first_name": "New",
             "last_name": "User",
-            "role": "physician",
+            "role": "practitioner",
         }
         response = await client.post(f"{AUTH_PATH}/register", json=payload)
 
@@ -76,7 +76,7 @@ class TestRegistration:
             "password": "V@lidP@ss123!",
             "first_name": "Bad",
             "last_name": "Email",
-            "role": "physician",
+            "role": "practitioner",
         }
         response = await client.post(f"{AUTH_PATH}/register", json=payload)
 
@@ -95,7 +95,7 @@ class TestLogin:
             "password": "V@lidP@ss123!",
             "first_name": "Login",
             "last_name": "Test",
-            "role": "physician",
+            "role": "practitioner",
         }
         await client.post(f"{AUTH_PATH}/register", json=reg_payload)
 
@@ -215,7 +215,7 @@ class TestTokenRefresh:
                 "password": password,
                 "first_name": "Refresh",
                 "last_name": "Test",
-                "role": "physician",
+                "role": "practitioner",
             },
         )
         login_resp = await client.post(

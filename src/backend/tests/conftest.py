@@ -129,10 +129,10 @@ def test_user_data() -> dict:
         "password": TEST_USER_PASSWORD,
         "first_name": "Test",
         "last_name": "Clinician",
-        "role": "physician",
-        "npi": "1234567890",
+        "role": "practitioner",
+        "npi": "1234567893",
         "is_active": True,
-        "tenant_id": "test-tenant-001",
+        "tenant_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     }
 
 
