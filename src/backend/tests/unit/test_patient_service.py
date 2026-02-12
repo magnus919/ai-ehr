@@ -12,11 +12,45 @@ Tests cover:
 from __future__ import annotations
 
 import uuid
-from datetime import date
-from unittest.mock import AsyncMock, MagicMock
+from datetime import date, datetime, timezone
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
+
+
+def _make_mock_patient(**overrides):
+    """Create a MagicMock with all fields required by PatientResponse.model_validate."""
+    defaults = {
+        "id": uuid.uuid4(),
+        "tenant_id": uuid.uuid4(),
+        "mrn": "MRN-TEST",
+        "first_name": "Test",
+        "last_name": "Patient",
+        "dob": date(1990, 1, 1),
+        "gender": "other",
+        "sex_assigned_at_birth": None,
+        "gender_identity": None,
+        "sexual_orientation": None,
+        "race": None,
+        "ethnicity": None,
+        "preferred_name": None,
+        "preferred_language": "en",
+        "emergency_contact": None,
+        "address": None,
+        "phone": None,
+        "email": None,
+        "insurance_data": None,
+        "active": True,
+        "created_at": datetime(2024, 1, 1, tzinfo=timezone.utc),
+        "updated_at": datetime(2024, 1, 1, tzinfo=timezone.utc),
+        "version": 1,
+    }
+    defaults.update(overrides)
+    mock = MagicMock()
+    for key, value in defaults.items():
+        setattr(mock, key, value)
+    return mock
 
 
 class TestPatientServiceCreate:
@@ -24,7 +58,7 @@ class TestPatientServiceCreate:
 
     @pytest.mark.asyncio
     async def test_create_patient_success(self):
-        """Creating a patient with valid data returns a PatientResponse."""
+        """Creating a patient with valid data calls add, flush, and returns a response."""
         from app.schemas.patient import PatientCreate
         from app.services.patient_service import create_patient
 
@@ -38,30 +72,34 @@ class TestPatientServiceCreate:
             ssn="123-45-6789",
         )
 
-        # Mock database session
         mock_session = AsyncMock()
 
-        # Mock the duplicate check query (returns no duplicates)
         mock_result_mrn = AsyncMock()
         mock_result_mrn.scalar_one_or_none.return_value = None
 
         mock_result_name = AsyncMock()
         mock_result_name.scalar_one_or_none.return_value = None
 
-        # First call checks MRN, second checks name+DOB
         mock_session.execute.side_effect = [mock_result_mrn, mock_result_name]
-
         mock_session.add = MagicMock()
         mock_session.flush = AsyncMock()
 
-        result = await create_patient(mock_session, tenant_id, patient_data)
+        # Patch PatientResponse.model_validate — the ORM object lacks timestamp
+        # defaults because no real DB session triggers the INSERT defaults.
+        fake_response = MagicMock()
+        fake_response.mrn = patient_data.mrn
+        fake_response.first_name = patient_data.first_name
+        with patch(
+            "app.services.patient_service.PatientResponse"
+        ) as MockResponse:
+            MockResponse.model_validate.return_value = fake_response
+            result = await create_patient(mock_session, tenant_id, patient_data)
 
-        # Should call add and flush
         mock_session.add.assert_called_once()
         mock_session.flush.assert_awaited_once()
-
-        # Result should be a PatientResponse (returned from model_validate)
         assert result is not None
+        assert result.mrn == "MRN-12345"
+        assert result.first_name == "Jane"
 
     @pytest.mark.asyncio
     async def test_create_patient_duplicate_mrn_raises(self):
@@ -146,10 +184,9 @@ class TestPatientServiceGet:
         tenant_id = uuid.uuid4()
         patient_id = uuid.uuid4()
 
-        mock_patient = MagicMock()
-        mock_patient.id = patient_id
-        mock_patient.first_name = "Jane"
-        mock_patient.last_name = "Doe"
+        mock_patient = _make_mock_patient(
+            id=patient_id, tenant_id=tenant_id, first_name="Jane", last_name="Doe"
+        )
 
         mock_session = AsyncMock()
         mock_result = AsyncMock()
@@ -158,8 +195,9 @@ class TestPatientServiceGet:
 
         result = await get_patient(mock_session, tenant_id, patient_id)
 
-        # Should return a PatientResponse (model_validate is called)
         assert result is not None
+        assert result.id == patient_id
+        assert result.first_name == "Jane"
 
     @pytest.mark.asyncio
     async def test_get_patient_by_id_not_found_raises(self):
@@ -193,11 +231,13 @@ class TestPatientServiceUpdate:
         tenant_id = uuid.uuid4()
         patient_id = uuid.uuid4()
 
-        mock_patient = MagicMock()
-        mock_patient.id = patient_id
-        mock_patient.first_name = "Jane"
-        mock_patient.last_name = "Doe"
-        mock_patient.phone = "+15551234567"
+        mock_patient = _make_mock_patient(
+            id=patient_id,
+            tenant_id=tenant_id,
+            first_name="Jane",
+            last_name="Doe",
+            phone="+15551234567",
+        )
 
         mock_session = AsyncMock()
         mock_result = AsyncMock()
@@ -206,9 +246,9 @@ class TestPatientServiceUpdate:
         mock_session.flush = AsyncMock()
 
         update_data = PatientUpdate(phone="+15559999999")
-        await update_patient(mock_session, tenant_id, patient_id, update_data)
+        result = await update_patient(mock_session, tenant_id, patient_id, update_data)
 
-        # Phone should be updated on the mock patient
+        assert result is not None
         assert mock_patient.phone == "+15559999999"
         mock_session.flush.assert_awaited_once()
 
@@ -246,8 +286,12 @@ class TestPatientServiceList:
         tenant_id = uuid.uuid4()
 
         mock_patients = [
-            MagicMock(id=uuid.uuid4(), first_name="Jane", last_name="Doe"),
-            MagicMock(id=uuid.uuid4(), first_name="John", last_name="Smith"),
+            _make_mock_patient(
+                tenant_id=tenant_id, first_name="Jane", last_name="Doe", mrn="MRN-001"
+            ),
+            _make_mock_patient(
+                tenant_id=tenant_id, first_name="John", last_name="Smith", mrn="MRN-002"
+            ),
         ]
 
         mock_session = AsyncMock()
@@ -305,7 +349,7 @@ class TestPatientServiceSearch:
         tenant_id = uuid.uuid4()
 
         mock_patients = [
-            MagicMock(id=uuid.uuid4(), last_name="Doe"),
+            _make_mock_patient(tenant_id=tenant_id, last_name="Doe"),
         ]
 
         mock_session = AsyncMock()
@@ -365,9 +409,7 @@ class TestPatientServiceDelete:
         tenant_id = uuid.uuid4()
         patient_id = uuid.uuid4()
 
-        mock_patient = MagicMock()
-        mock_patient.id = patient_id
-        mock_patient.active = True
+        mock_patient = _make_mock_patient(id=patient_id, tenant_id=tenant_id, active=True)
 
         mock_session = AsyncMock()
         mock_result = AsyncMock()

@@ -21,7 +21,6 @@ import {
 import { clsx } from 'clsx';
 import { useAuthStore } from '@/store/authStore';
 import { useUIStore, type Theme } from '@/store/uiStore';
-import { getInitials } from '@/utils/formatters';
 import { ROLE_LABELS } from '@/utils/constants';
 
 // -----------------------------------------------------------------------------
@@ -140,12 +139,9 @@ export function Header() {
         <Menu as="div" className="relative">
           <MenuButton className="flex items-center gap-2 rounded-md p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-600 text-sm font-medium text-white">
-              {user ? getInitials(user as unknown as import('@/types').HumanName) : (
-                <span>
-                  {user?.firstName?.charAt(0)?.toUpperCase() ?? '?'}
-                  {user?.lastName?.charAt(0)?.toUpperCase() ?? '?'}
-                </span>
-              )}
+              {user
+                ? `${user.firstName.charAt(0).toUpperCase()}${user.lastName.charAt(0).toUpperCase()}`
+                : '?'}
             </div>
             <div className="hidden text-left md:block">
               <p className="text-sm font-medium text-gray-900 dark:text-gray-100">

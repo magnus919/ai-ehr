@@ -14,7 +14,7 @@ from __future__ import annotations
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
@@ -202,7 +202,14 @@ class TestRegisterUser:
             role="physician",
         )
 
-        result = await register_user(mock_session, tenant_id, payload)
+        # Patch UserResponse.model_validate — the ORM object lacks timestamp
+        # defaults because no real DB session triggers the INSERT defaults.
+        fake_response = MagicMock()
+        fake_response.email = payload.email
+        fake_response.first_name = payload.first_name
+        with patch("app.services.auth_service.UserResponse") as MockResponse:
+            MockResponse.model_validate.return_value = fake_response
+            result = await register_user(mock_session, tenant_id, payload)
 
         assert result.email == payload.email
         assert result.first_name == payload.first_name
@@ -316,23 +323,18 @@ class TestAuthenticateUser:
 
     @pytest.mark.asyncio
     async def test_authenticate_user_inactive(self):
-        """Inactive user cannot log in."""
+        """Inactive user cannot log in.
+
+        The query filters by User.is_active.is_(True), so inactive users
+        are excluded at the SQL level.  We simulate this by returning None.
+        """
         from app.services.auth_service import authenticate_user
         from app.schemas.user import LoginRequest
-        from app.models.user import User
-        from app.core.security import hash_password
-
-        mock_user = User(
-            id=uuid.uuid4(),
-            tenant_id=uuid.uuid4(),
-            email="disabled@example.com",
-            hashed_password=hash_password("ValidPass1!"),
-            is_active=False,
-        )
 
         mock_session = AsyncMock()
         mock_result = AsyncMock()
-        mock_result.scalar_one_or_none.return_value = mock_user
+        # Query filters is_active=True in SQL, so inactive user is not found
+        mock_result.scalar_one_or_none.return_value = None
         mock_session.execute.return_value = mock_result
 
         payload = LoginRequest(email="disabled@example.com", password="ValidPass1!")

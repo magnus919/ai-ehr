@@ -62,8 +62,7 @@ interface DiagnosisEntry {
 
 export function EncounterForm({
   encounter,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  patientId,
+  patientId: _patientId,
   onSubmit,
   isLoading = false,
   onCancel,
