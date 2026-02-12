@@ -73,7 +73,7 @@ class TestTokenGeneration:
         token = create_access_token(
             user_id=user_id,
             tenant_id=tenant_id,
-            role="physician",
+            role="practitioner",
         )
 
         assert token is not None
@@ -112,7 +112,7 @@ class TestTokenGeneration:
         payload = {
             "sub": str(user_id),
             "tenant_id": str(tenant_id),
-            "role": "physician",
+            "role": "practitioner",
             "exp": now - timedelta(seconds=1),
             "iat": now - timedelta(seconds=60),
             "type": "access",
@@ -132,7 +132,7 @@ class TestTokenGeneration:
         user_id = uuid.uuid4()
         tenant_id = uuid.uuid4()
         token = create_access_token(
-            user_id=user_id, tenant_id=tenant_id, role="physician"
+            user_id=user_id, tenant_id=tenant_id, role="practitioner"
         )
 
         # Corrupt the token
@@ -155,7 +155,7 @@ class TestTokenGeneration:
         user_id = uuid.uuid4()
         tenant_id = uuid.uuid4()
         access = create_access_token(
-            user_id=user_id, tenant_id=tenant_id, role="physician"
+            user_id=user_id, tenant_id=tenant_id, role="practitioner"
         )
         refresh = create_refresh_token(user_id=user_id, tenant_id=tenant_id)
 
@@ -171,7 +171,7 @@ class TestTokenGeneration:
         user_id = uuid.uuid4()
         tenant_id = uuid.uuid4()
         token = create_access_token(
-            user_id=user_id, tenant_id=tenant_id, role="physician"
+            user_id=user_id, tenant_id=tenant_id, role="practitioner"
         )
         claims = decode_token(token)
 
@@ -199,7 +199,7 @@ class TestRegisterUser:
             password="SecureP@ss123!",
             first_name="New",
             last_name="User",
-            role="physician",
+            role="practitioner",
         )
 
         # Patch UserResponse.model_validate — the ORM object lacks timestamp
@@ -237,7 +237,7 @@ class TestRegisterUser:
             password="SecureP@ss123!",
             first_name="New",
             last_name="User",
-            role="physician",
+            role="practitioner",
         )
 
         with pytest.raises(HTTPException) as exc_info:
@@ -262,7 +262,7 @@ class TestAuthenticateUser:
             email="doctor@example.com",
             hashed_password=hash_password("ValidPass1!"),
             is_active=True,
-            role="physician",
+            role="practitioner",
             mfa_enabled=False,
         )
 
