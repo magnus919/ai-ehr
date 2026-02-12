@@ -189,6 +189,7 @@ class TestRegisterUser:
         from app.schemas.user import UserCreate
 
         mock_session = AsyncMock()
+        mock_session.add = MagicMock()  # add() is sync
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = None  # No duplicate user
         mock_session.execute.return_value = mock_result
@@ -367,7 +368,7 @@ class TestMFA:
 
         assert len(result.secret) == 32  # Base32-encoded TOTP secret
         assert "otpauth://totp/" in result.provisioning_uri
-        assert "user@example.com" in result.provisioning_uri
+        assert "user%40example.com" in result.provisioning_uri
         mock_session.flush.assert_called_once()
 
     @pytest.mark.asyncio

@@ -25,7 +25,7 @@ class TestNPIValidator:
         """Multiple known-valid NPIs pass validation."""
         from app.utils.validators import validate_npi
 
-        valid_npis = ["1234567893", "1245319599", "1669574637"]
+        valid_npis = ["1234567893", "1245319599", "1669574638"]
         for npi in valid_npis:
             assert validate_npi(npi) is True, f"Expected NPI {npi} to be valid"
 
