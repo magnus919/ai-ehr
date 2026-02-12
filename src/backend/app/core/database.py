@@ -57,14 +57,17 @@ class Base(AsyncAttrs, DeclarativeBase):
 
 
 def _build_engine():
-    return create_async_engine(
-        settings.DATABASE_URL,
-        pool_size=settings.DATABASE_POOL_SIZE,
-        max_overflow=settings.DATABASE_MAX_OVERFLOW,
-        pool_recycle=settings.DATABASE_POOL_RECYCLE,
-        echo=settings.DATABASE_ECHO,
-        pool_pre_ping=True,
-    )
+    url = settings.DATABASE_URL
+    kwargs: dict = {"echo": settings.DATABASE_ECHO}
+    # SQLite uses NullPool and does not accept pool tuning arguments
+    if not url.startswith("sqlite"):
+        kwargs.update(
+            pool_size=settings.DATABASE_POOL_SIZE,
+            max_overflow=settings.DATABASE_MAX_OVERFLOW,
+            pool_recycle=settings.DATABASE_POOL_RECYCLE,
+            pool_pre_ping=True,
+        )
+    return create_async_engine(url, **kwargs)
 
 
 engine = _build_engine()

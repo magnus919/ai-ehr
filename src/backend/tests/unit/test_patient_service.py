@@ -89,9 +89,7 @@ class TestPatientServiceCreate:
         fake_response = MagicMock()
         fake_response.mrn = patient_data.mrn
         fake_response.first_name = patient_data.first_name
-        with patch(
-            "app.services.patient_service.PatientResponse"
-        ) as MockResponse:
+        with patch("app.services.patient_service.PatientResponse") as MockResponse:
             MockResponse.model_validate.return_value = fake_response
             result = await create_patient(mock_session, tenant_id, patient_data)
 
@@ -409,7 +407,9 @@ class TestPatientServiceDelete:
         tenant_id = uuid.uuid4()
         patient_id = uuid.uuid4()
 
-        mock_patient = _make_mock_patient(id=patient_id, tenant_id=tenant_id, active=True)
+        mock_patient = _make_mock_patient(
+            id=patient_id, tenant_id=tenant_id, active=True
+        )
 
         mock_session = AsyncMock()
         mock_result = AsyncMock()

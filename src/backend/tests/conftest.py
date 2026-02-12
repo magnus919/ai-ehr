@@ -49,13 +49,10 @@ from app.core.database import Base, get_db, tenant_context  # noqa: E402
 
 TEST_DATABASE_URL = settings.DATABASE_URL
 
-_test_engine = create_async_engine(
-    TEST_DATABASE_URL,
-    pool_size=5,
-    max_overflow=5,
-    pool_pre_ping=True,
-    echo=False,
-)
+_test_engine_kwargs: dict = {"echo": False}
+if not TEST_DATABASE_URL.startswith("sqlite"):
+    _test_engine_kwargs.update(pool_size=5, max_overflow=5, pool_pre_ping=True)
+_test_engine = create_async_engine(TEST_DATABASE_URL, **_test_engine_kwargs)
 
 _test_session_factory = async_sessionmaker(
     bind=_test_engine,
