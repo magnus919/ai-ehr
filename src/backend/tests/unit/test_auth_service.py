@@ -189,7 +189,7 @@ class TestRegisterUser:
         from app.schemas.user import UserCreate
 
         mock_session = AsyncMock()
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = None  # No duplicate user
         mock_session.execute.return_value = mock_result
 
@@ -224,7 +224,7 @@ class TestRegisterUser:
         from app.models.user import User
 
         mock_session = AsyncMock()
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_user = User(
             id=uuid.uuid4(), email="existing@example.com", tenant_id=uuid.uuid4()
         )
@@ -267,7 +267,7 @@ class TestAuthenticateUser:
         )
 
         mock_session = AsyncMock()
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_result
 
@@ -296,7 +296,7 @@ class TestAuthenticateUser:
         )
 
         mock_session = AsyncMock()
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_result
 
@@ -312,7 +312,7 @@ class TestAuthenticateUser:
         from app.schemas.user import LoginRequest
 
         mock_session = AsyncMock()
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = None
         mock_session.execute.return_value = mock_result
 
@@ -332,7 +332,7 @@ class TestAuthenticateUser:
         from app.schemas.user import LoginRequest
 
         mock_session = AsyncMock()
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         # Query filters is_active=True in SQL, so inactive user is not found
         mock_result.scalar_one_or_none.return_value = None
         mock_session.execute.return_value = mock_result
@@ -359,7 +359,7 @@ class TestMFA:
         )
 
         mock_session = AsyncMock()
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_result
 
@@ -387,7 +387,7 @@ class TestMFA:
         )
 
         mock_session = AsyncMock()
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_result
 
@@ -417,7 +417,7 @@ class TestMFA:
         )
 
         mock_session = AsyncMock()
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_result
 

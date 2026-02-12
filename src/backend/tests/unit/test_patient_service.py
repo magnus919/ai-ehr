@@ -74,10 +74,10 @@ class TestPatientServiceCreate:
 
         mock_session = AsyncMock()
 
-        mock_result_mrn = AsyncMock()
+        mock_result_mrn = MagicMock()
         mock_result_mrn.scalar_one_or_none.return_value = None
 
-        mock_result_name = AsyncMock()
+        mock_result_name = MagicMock()
         mock_result_name.scalar_one_or_none.return_value = None
 
         mock_session.execute.side_effect = [mock_result_mrn, mock_result_name]
@@ -121,7 +121,7 @@ class TestPatientServiceCreate:
         existing_patient = MagicMock()
         existing_patient.mrn = "MRN-DUP"
 
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = existing_patient
         mock_session.execute.return_value = mock_result
 
@@ -150,7 +150,7 @@ class TestPatientServiceCreate:
         mock_session = AsyncMock()
 
         # MRN check passes (no duplicate)
-        mock_result_mrn = AsyncMock()
+        mock_result_mrn = MagicMock()
         mock_result_mrn.scalar_one_or_none.return_value = None
 
         # Name+DOB check finds duplicate
@@ -159,7 +159,7 @@ class TestPatientServiceCreate:
         existing_patient.last_name = "Doe"
         existing_patient.mrn = "MRN-OLD"
 
-        mock_result_name = AsyncMock()
+        mock_result_name = MagicMock()
         mock_result_name.scalar_one_or_none.return_value = existing_patient
 
         mock_session.execute.side_effect = [mock_result_mrn, mock_result_name]
@@ -187,7 +187,7 @@ class TestPatientServiceGet:
         )
 
         mock_session = AsyncMock()
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = mock_patient
         mock_session.execute.return_value = mock_result
 
@@ -206,7 +206,7 @@ class TestPatientServiceGet:
         patient_id = uuid.uuid4()
 
         mock_session = AsyncMock()
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = None
         mock_session.execute.return_value = mock_result
 
@@ -238,7 +238,7 @@ class TestPatientServiceUpdate:
         )
 
         mock_session = AsyncMock()
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = mock_patient
         mock_session.execute.return_value = mock_result
         mock_session.flush = AsyncMock()
@@ -260,7 +260,7 @@ class TestPatientServiceUpdate:
         patient_id = uuid.uuid4()
 
         mock_session = AsyncMock()
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = None
         mock_session.execute.return_value = mock_result
 
@@ -295,11 +295,11 @@ class TestPatientServiceList:
         mock_session = AsyncMock()
 
         # Mock count query
-        mock_count_result = AsyncMock()
+        mock_count_result = MagicMock()
         mock_count_result.scalar.return_value = 2
 
         # Mock select query
-        mock_select_result = AsyncMock()
+        mock_select_result = MagicMock()
         mock_select_result.scalars.return_value.all.return_value = mock_patients
 
         mock_session.execute.side_effect = [mock_count_result, mock_select_result]
@@ -321,11 +321,11 @@ class TestPatientServiceList:
         mock_session = AsyncMock()
 
         # Mock count query
-        mock_count_result = AsyncMock()
+        mock_count_result = MagicMock()
         mock_count_result.scalar.return_value = 0
 
         # Mock select query
-        mock_select_result = AsyncMock()
+        mock_select_result = MagicMock()
         mock_select_result.scalars.return_value.all.return_value = []
 
         mock_session.execute.side_effect = [mock_count_result, mock_select_result]
@@ -353,11 +353,11 @@ class TestPatientServiceSearch:
         mock_session = AsyncMock()
 
         # Mock count query
-        mock_count_result = AsyncMock()
+        mock_count_result = MagicMock()
         mock_count_result.scalar.return_value = 1
 
         # Mock select query
-        mock_select_result = AsyncMock()
+        mock_select_result = MagicMock()
         mock_select_result.scalars.return_value.all.return_value = mock_patients
 
         mock_session.execute.side_effect = [mock_count_result, mock_select_result]
@@ -379,11 +379,11 @@ class TestPatientServiceSearch:
         mock_session = AsyncMock()
 
         # Mock count query
-        mock_count_result = AsyncMock()
+        mock_count_result = MagicMock()
         mock_count_result.scalar.return_value = 0
 
         # Mock select query
-        mock_select_result = AsyncMock()
+        mock_select_result = MagicMock()
         mock_select_result.scalars.return_value.all.return_value = []
 
         mock_session.execute.side_effect = [mock_count_result, mock_select_result]
@@ -412,7 +412,7 @@ class TestPatientServiceDelete:
         )
 
         mock_session = AsyncMock()
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = mock_patient
         mock_session.execute.return_value = mock_result
         mock_session.flush = AsyncMock()
@@ -432,7 +432,7 @@ class TestPatientServiceDelete:
         patient_id = uuid.uuid4()
 
         mock_session = AsyncMock()
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = None
         mock_session.execute.return_value = mock_result
 
