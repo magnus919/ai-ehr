@@ -37,7 +37,6 @@ class TestPHIAccessAuditLogging:
             PATIENTS_PATH, json=sample_patient_data, headers=auth_headers
         )
         assert create_resp.status_code == 201
-        patient_id = create_resp.json()["id"]
 
         # Query audit logs for the creation event (resource_type is lowercase
         # in the route handler's record_audit call)
