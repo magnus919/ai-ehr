@@ -5,10 +5,10 @@
 | **Project**      | OpenMedRecord                              |
 | **Type**         | Enterprise Electronic Health Record System |
 | **License**      | Open Source (Apache 2.0)                   |
-| **Version**      | 1.1.0                                      |
+| **Version**      | 1.2.0                                      |
 | **Status**       | Draft                                      |
-| **Change Note**  | v1.1.0 -- Incorporated findings from tech lead, architecture, and security reviews. Added CDS, reporting, consent, and HL7v2 services. Expanded data model. Added ADRs 006-008. Reconciled cross-document inconsistencies. |
-| **Last Updated** | 2026-02-11                                 |
+| **Change Note**  | v1.2.0 -- Aligned documentation with Phase 1 implementation: updated RBAC roles to match implemented set, documented global email uniqueness constraint, added patient soft-delete and encounter validation behavior notes. |
+| **Last Updated** | 2026-02-12                                 |
 
 ---
 
@@ -481,6 +481,12 @@ Aurora PostgreSQL Cluster
 
 **Bridge Model Details:**
 
+> **Phase 1 Implementation Note:** The current implementation uses a single
+> `users` table with a `tenant_id` foreign key. Email addresses are globally
+> unique across all tenants (i.e., the duplicate-email check does not filter by
+> tenant). The `shared.tenant_users` bridge table described below is planned for
+> Phase 2, which will enable clinicians to work across multiple organizations.
+
 - The `shared.tenant_users` table maps Cognito user identities to one or more
   tenant schemas, enabling clinicians who work across organizations to switch
   context.
@@ -721,19 +727,24 @@ handles bidirectional transformation.
 OpenMedRecord combines Role-Based Access Control (RBAC) with Attribute-Based
 Access Control (ABAC) for fine-grained authorization.
 
-**RBAC Roles:**
+**RBAC Roles (Phase 1 -- Implemented):**
 
 | Role               | Description                                          |
 |--------------------|------------------------------------------------------|
-| `system_admin`     | Full system access, tenant management                |
-| `org_admin`        | Tenant-level administration, user management         |
-| `physician`        | Full clinical read/write within care team            |
+| `admin`            | Full system and tenant administration                |
+| `practitioner`     | Full clinical read/write within care team            |
 | `nurse`            | Clinical read/write, limited ordering                |
+| `staff`            | Administrative staff, scheduling and billing access  |
+| `patient`          | Own records only (patient portal)                    |
+
+**RBAC Roles (Phase 2 -- Planned):**
+
+| Role               | Description                                          |
+|--------------------|------------------------------------------------------|
+| `org_admin`        | Tenant-level administration, user management         |
 | `pharmacist`       | Medication review, order verification                |
 | `lab_tech`         | Lab order processing, result entry                   |
-| `scheduler`        | Appointment management, no clinical data             |
 | `billing`          | Encounter and diagnosis read, no clinical notes      |
-| `patient`          | Own records only (patient portal)                    |
 | `read_only_audit`  | Audit log read access for compliance officers        |
 
 **ABAC Attributes:**
@@ -1261,7 +1272,7 @@ GET    /api/v1/patients/{id}                # Get patient by ID
 POST   /api/v1/patients                     # Register new patient
 PUT    /api/v1/patients/{id}                # Update patient
 PATCH  /api/v1/patients/{id}                # Partial update
-DELETE /api/v1/patients/{id}                # Soft delete (deactivate)
+DELETE /api/v1/patients/{id}                # Soft delete (sets active=false; subsequent GETs return 404)
 GET    /api/v1/patients/{id}/encounters     # Patient encounters
 GET    /api/v1/patients/{id}/observations   # Patient observations
 GET    /api/v1/patients/{id}/conditions     # Patient conditions
@@ -1274,7 +1285,7 @@ POST   /api/v1/patients/match              # Probabilistic patient matching
 
 ```
 GET    /api/v1/encounters                        # Search encounters
-POST   /api/v1/encounters                        # Create encounter
+POST   /api/v1/encounters                        # Create encounter (validates patient exists; 404 if not)
 PUT    /api/v1/encounters/{id}                   # Update encounter
 PATCH  /api/v1/encounters/{id}/status            # Update encounter status
 

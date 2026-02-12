@@ -1,9 +1,9 @@
 # OpenMedRecord Compliance Requirements Document
 
 **Document ID:** OMR-COMP-001
-**Version:** 1.1
-**Effective Date:** 2026-02-11
-**Change Note:** v1.1 -- Incorporated findings from security and tech lead reviews. Aligned audit retention to 7 years, reconciled RPO/RTO to tiered model, clarified key rotation cadences (CMK/DEK/JWT), added 42 CFR Part 2 and psychotherapy notes sections, added disclosure-specific audit events.
+**Version:** 1.2
+**Effective Date:** 2026-02-12
+**Change Note:** v1.2 -- Aligned MFA criterion (d)(13) with Phase 1 implementation (TOTP only; WebAuthn/FIDO2 and push MFA planned for Phase 2).
 **Classification:** Confidential
 **Owner:** Compliance & Security Team
 
@@ -325,7 +325,7 @@ This section maps the ONC Health IT Certification Program criteria (45 CFR 170.3
 | (d)(10) | Auditing Actions on Health Information | Granular audit logging for all CRUD operations on health information. Audit entries include: who (user), what (action and resource), when (timestamp), where (source IP and system), and why (stated purpose or context). Query operations on ePHI are logged including search parameters. | FHIR AuditEvent, comprehensive audit trail |
 | (d)(11) | Accounting of Disclosures | Automated tracking of ePHI disclosures as required by HIPAA. Disclosure log includes: date, recipient, purpose, description of information disclosed. Patient-accessible disclosure report covering the prior 7 years. Disclosures for treatment, payment, and healthcare operations are optionally tracked. | Disclosure tracking module, patient portal access |
 | (d)(12) | Encrypt Authentication Credentials | All authentication credentials are encrypted in transit and at rest. Passwords are hashed using Argon2id (not reversibly encrypted). API keys are stored encrypted. OAuth tokens are encrypted at rest. No credentials appear in logs. | Argon2id, AES-256 credential encryption, log redaction |
-| (d)(13) | Multi-Factor Authentication | MFA is required for all users accessing ePHI. Supported factors: TOTP (RFC 6238), WebAuthn/FIDO2 hardware security keys, push notification via authenticator app. MFA enrollment is enforced at first login. Recovery codes are provided for account recovery. | TOTP, WebAuthn/FIDO2, push MFA |
+| (d)(13) | Multi-Factor Authentication | MFA is required for all users accessing ePHI. **Phase 1:** TOTP (RFC 6238) is implemented with enrollment enforced at first login and recovery codes for account recovery. **Phase 2:** WebAuthn/FIDO2 hardware security keys and push notification via authenticator app. | Phase 1: TOTP; Phase 2: WebAuthn/FIDO2, push MFA |
 
 ### 4.4 Interoperability Criteria -- 170.315(g)
 
