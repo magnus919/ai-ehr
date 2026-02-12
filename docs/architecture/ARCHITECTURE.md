@@ -5,8 +5,9 @@
 | **Project**      | OpenMedRecord                              |
 | **Type**         | Enterprise Electronic Health Record System |
 | **License**      | Open Source (Apache 2.0)                   |
-| **Version**      | 1.0.0                                      |
+| **Version**      | 1.1.0                                      |
 | **Status**       | Draft                                      |
+| **Change Note**  | v1.1.0 -- Incorporated findings from tech lead, architecture, and security reviews. Added CDS, reporting, consent, and HL7v2 services. Expanded data model. Added ADRs 006-008. Reconciled cross-document inconsistencies. |
 | **Last Updated** | 2026-02-11                                 |
 
 ---
@@ -123,9 +124,10 @@ settings.
    HIPAA compliance, data confidentiality, and least-privilege access. PHI is
    encrypted at rest and in transit with no exceptions.
 
-2. **FHIR-Native** -- The system is built around FHIR R4 as its canonical data
-   model. Internal services speak FHIR; legacy formats (HL7v2, CDA) are
-   translated at the boundary.
+2. **FHIR-First** -- The system uses a relational data model optimized for
+   clinical workflows with a FHIR R4 facade for interoperability. Internal
+   services use domain-specific models; FHIR translation occurs at the API
+   boundary.
 
 3. **Event-Driven** -- Services communicate asynchronously through events
    wherever possible, reducing temporal coupling and improving resilience.
@@ -173,13 +175,16 @@ partition within the shared Aurora cluster.
    |Tokens  | |Search   | |Allergy | |eRx     | |Rooms   | |PHI Audit |
    +--------+ +---------+ +--------+ +--------+ +--------+ +----------+
         |          |          |          |         |          |
-   +----v---+ +----v---+                                     |
-   | fhir   | |notif.  |    All services publish events      |
-   |gateway | |service |    to EventBridge ------------------>+
-   |        | |        |
-   |R4 API  | |Email,  |
-   |Mapping | |SMS,Push|
-   +--------+ +--------+
+   +----v---+ +----v---+ +---v-----+ +-v------+ +v--------+ |
+   | fhir   | |notif.  | |  cds   | |report. | |consent  | |
+   |gateway | |service | |service | |service | |service  | |
+   |        | |        | |        | |        | |         | |
+   |R4 API  | |Email,  | |CDS     | |eCQM,   | |Consent  | |
+   |Mapping | |SMS,Push| |Hooks,  | |Dashb., | |Eval,    | |
+   |        | |        | |Drug Ix | |Pop Hlth| |42CFR P2 | |
+   +--------+ +--------+ +--------+ +--------+ +---------+ |
+        |                                                    |
+        +-- All services publish events to EventBridge ----->+
 ```
 
 **Service Catalog:**
@@ -194,6 +199,10 @@ partition within the shared Aurora cluster.
 | `audit-service`        | Immutable audit log ingestion, compliance reporting       | 8005  |
 | `fhir-gateway`         | FHIR R4 facade, resource mapping, bulk data export        | 8006  |
 | `notification-service` | Multi-channel notifications (email, SMS, push, in-app)    | 8007  |
+| `cds-service`          | Clinical decision support, drug interaction checking, CDS Hooks, clinical rules engine | 8008  |
+| `reporting-service`    | eCQM calculation (CQL), operational dashboards, population health analytics, ad hoc reports | 8009  |
+| `hl7v2-engine`         | HL7v2 message parsing, routing, transformation (ADT, ORM, ORU, DFT). MLLP/TLS listener | 2575  |
+| `consent-service`      | FHIR Consent resource management, consent evaluation at data access, 42 CFR Part 2 enforcement | 8010  |
 
 #### 2.1.2 Domain Model
 
@@ -427,14 +436,17 @@ three subnet tiers.
 
 **Security Group Matrix:**
 
-| Source SG         | Destination SG     | Port   | Protocol | Purpose               |
-|-------------------|--------------------|--------|----------|-----------------------|
-| ALB-SG            | ECS-SG             | 8000-8007 | TCP  | ALB to services       |
-| ECS-SG            | Aurora-SG          | 5432   | TCP      | Services to database  |
-| ECS-SG            | Redis-SG           | 6379   | TCP      | Services to cache     |
-| ECS-SG            | VPC-Endpoints-SG   | 443    | TCP      | Services to AWS APIs  |
-| CloudFront-PL     | ALB-SG             | 443    | TCP      | CDN to ALB            |
-| 0.0.0.0/0         | ALB-SG             | 443    | TCP      | Internet to ALB (WAF) |
+| Source SG               | Destination SG     | Port      | Protocol | Purpose                       |
+|-------------------------|--------------------|-----------|----------|-------------------------------|
+| ALB-SG                  | ECS-SG             | 8000-8010 | TCP      | ALB to services               |
+| ECS-SG                  | Aurora-SG          | 5432      | TCP      | Services to database          |
+| ECS-SG                  | Redis-SG           | 6379      | TCP      | Services to cache             |
+| ECS-SG                  | VPC-Endpoints-SG   | 443       | TCP      | Services to AWS APIs          |
+| CloudFront-PL           | ALB-SG             | 443       | TCP      | CDN to ALB                    |
+| VPN/DirectConnect       | NLB-SG             | 2575      | TCP      | HL7v2 MLLP ingress            |
+
+> **Note:** Default deny on all security groups. Only explicitly listed rules
+> are permitted. No security group allows `0.0.0.0/0` ingress.
 
 ---
 
@@ -528,7 +540,7 @@ Aurora PostgreSQL Cluster
   | email      VARCHAR|UQ     | actor_id     UUID  |FK
   | given_name VARCHAR|       | actor_role  VARCHAR|
   | family_name VARCHAR|      | action     VARCHAR |
-  | role       VARCHAR|       | resource_type VARCHAR|
+  | role_id      UUID |FK     | resource_type VARCHAR|
   | specialty  VARCHAR|       | resource_id  UUID  |
   | npi        VARCHAR|       | detail       JSONB |
   | active    BOOLEAN |       | source_ip  VARCHAR |
@@ -587,6 +599,39 @@ Aurora PostgreSQL Cluster
        | Aurora      |        | alerts      |
        +-------------+        +-------------+
 ```
+
+#### 2.3.3a Redis Cache PHI Policy
+
+ElastiCache Redis is used for performance optimization but carries additional
+risk as an in-memory data store. The following policies apply:
+
+**Permitted Cache Contents:**
+
+- Patient demographics: name, MRN, date of birth, active status
+- Active medication list (code, display, status -- no prescriber notes)
+- Allergy list (code, display, criticality, clinical status)
+- Session tokens and CSRF tokens
+- FHIR CapabilityStatement and metadata responses
+- Rate limiting counters
+
+**Prohibited Cache Contents (MUST NOT be cached):**
+
+- Social Security Numbers (SSN)
+- Substance abuse data (42 CFR Part 2 protected)
+- Psychotherapy notes
+- HIV/AIDS status (where state law restricts)
+- Genomic data
+- Full clinical note content
+
+**Cache Security Controls:**
+
+- All cache entries containing PHI have a maximum TTL of 15 minutes.
+- Redis `MONITOR` and `DEBUG` commands are disabled in production via
+  `rename-command` configuration.
+- Redis AUTH is required; credentials rotated per secret rotation policy.
+- Encryption at rest (KMS) and in transit (TLS) are mandatory.
+- Cache keys use tenant-scoped prefixes (`{tenant_id}:{resource}:{id}`)
+  to prevent cross-tenant data leakage.
 
 #### 2.3.4 FHIR Resource Mapping
 
@@ -730,7 +775,9 @@ patient records outside their normal care team scope. This access:
 1. Requires explicit user confirmation with documented reason.
 2. Generates a high-priority audit event.
 3. Triggers immediate notification to the privacy officer.
-4. Is time-limited (default: 4 hours).
+4. Is time-limited (60 minutes default, configurable maximum of 4 hours with
+   security officer approval). Periodic re-authentication is required every
+   30 minutes during break-glass sessions.
 5. Is subject to post-hoc review.
 
 #### 2.4.3 Encryption
@@ -757,6 +804,16 @@ patient records outside their normal care team scope. This access:
 | ECS to ElastiCache       | TLS         | 1.2              | ElastiCache CA cert   |
 | ECS to DynamoDB          | TLS         | 1.2              | AWS endpoint cert     |
 | Inter-service (ECS-ECS)  | mTLS        | 1.3              | ACM Private CA        |
+
+**Secret Rotation Cadences:**
+
+| Secret Type             | Rotation Period | Mechanism                                  | Notes                                       |
+|-------------------------|-----------------|--------------------------------------------|---------------------------------------------|
+| Database credentials    | 90 days         | AWS Secrets Manager automatic rotation     | Lambda-based rotation function              |
+| JWT signing keys        | Annual          | Manual rotation with 7-day overlap period  | Both old and new keys valid during overlap   |
+| API partner keys        | Per-partner policy, max 1 year | Secrets Manager or partner portal | Expiry enforced; alerts at 30 days remaining |
+| KMS CMK                 | Annual          | KMS automatic key rotation                 | Previous key versions retained for decrypt  |
+| Application-level DEKs  | 90 days         | Application-managed envelope encryption    | Re-encryption of active data on rotation    |
 
 #### 2.4.4 Audit Logging Pipeline
 
@@ -1101,6 +1158,12 @@ engine that translates between HL7v2 messages and internal FHIR resources.
 | `If-Match`           | No*      | ETag for optimistic concurrency        |
 | `If-None-Match`      | No       | ETag for conditional GET (caching)     |
 
+> **Security Requirement:** The server MUST validate that the `X-Tenant-ID`
+> header matches the `tenant_id` claim in the JWT token on every request.
+> Mismatches MUST be rejected with HTTP 403 Forbidden and logged as potential
+> attack attempts (event type `security.tenant_mismatch`, severity CRITICAL).
+> This prevents tenant impersonation via header manipulation.
+
 **Standard Response Envelope:**
 
 ```json
@@ -1167,13 +1230,17 @@ cursor-based pagination (for large data sets and streaming).
 
 ### 3.3 Rate Limiting
 
-| Client Type        | Rate Limit              | Window   | Burst   |
-|--------------------|-------------------------|----------|---------|
-| Authenticated user | 1,000 requests          | 1 minute | 100     |
-| Service-to-service | 5,000 requests          | 1 minute | 500     |
-| SMART app          | 500 requests            | 1 minute | 50      |
-| Bulk export        | 10 concurrent exports   | --       | --      |
-| Public (unauth.)   | 20 requests             | 1 minute | 5       |
+| Client Type         | Rate Limit              | Window   | Burst   |
+|---------------------|-------------------------|----------|---------|
+| Backend service     | 1,000 requests          | 1 minute | 100     |
+| Clinician-facing    | 300 requests            | 1 minute | 50      |
+| Patient-facing      | 60 requests             | 1 minute | 10      |
+| SMART on FHIR app   | 300 requests            | 1 minute | 50      |
+| Bulk export         | 10 concurrent exports   | --       | --      |
+| Public (unauth.)    | 20 requests             | 1 minute | 5       |
+
+Rate limits are applied consistently across both `/api/v1/` (REST) and `/fhir/`
+(FHIR R4) endpoints. The same token bucket algorithm is used for both surfaces.
 
 Rate limit headers are returned on every response:
 
@@ -1294,7 +1361,7 @@ GET    /.well-known/smart-configuration                     # SMART discovery
                    | tenant_id   (FK) |          | tenant_id   (FK) |
                    | cognito_sub      |          | name             |
                    | email            |          | type             |
-                   | role             |          | address          |
+                   | role_id     (FK) |          | address          |
                    +--------+---------+          +--------+---------+
                             |                             |
                             |         +-------------------+
@@ -1370,6 +1437,14 @@ CREATE TABLE patients (
     birth_date      DATE NOT NULL,
     gender          VARCHAR(20) NOT NULL CHECK (gender IN (
                         'male', 'female', 'other', 'unknown')),
+                    -- Note: 'gender' is administrative sex per FHIR Patient.gender.
+                    -- See gender_identity and sex_assigned_at_birth for clinical use.
+    sex_assigned_at_birth VARCHAR(20) CHECK (sex_assigned_at_birth IN (
+                        'male', 'female', 'unknown')),
+    gender_identity VARCHAR(50),     -- Separate from administrative sex per USCDI v3
+    sexual_orientation VARCHAR(50),  -- USCDI v3
+    preferred_name  VARCHAR(200),
+    preferred_language VARCHAR(35),  -- BCP-47 code (e.g., 'en-US', 'es-419')
     deceased        BOOLEAN DEFAULT FALSE,
     deceased_date   TIMESTAMPTZ,
     address         JSONB DEFAULT '[]'::jsonb,
@@ -1379,6 +1454,10 @@ CREATE TABLE patients (
     language        VARCHAR(10) DEFAULT 'en',
     race            JSONB,
     ethnicity       JSONB,
+    ssn_encrypted   BYTEA,           -- Fernet/AES encrypted
+    ssn_hmac        VARCHAR(64),     -- HMAC index for exact-match search
+    preferred_pharmacy_id UUID,
+    emergency_contact JSONB,
     active          BOOLEAN DEFAULT TRUE,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -1525,6 +1604,168 @@ CREATE INDEX idx_audit_resource ON audit_logs (resource_type, resource_id);
 CREATE INDEX idx_audit_event_type ON audit_logs (event_type, timestamp DESC);
 CREATE INDEX idx_audit_tenant ON audit_logs (tenant_id, timestamp DESC);
 CREATE INDEX idx_audit_action ON audit_logs (action, timestamp DESC);
+```
+
+#### `roles` and RBAC Tables
+
+```sql
+CREATE TABLE roles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id VARCHAR(100) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    is_system_role BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(tenant_id, name)
+);
+
+CREATE TABLE permissions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    resource_type VARCHAR(100) NOT NULL,
+    operation VARCHAR(50) NOT NULL CHECK (operation IN ('create', 'read', 'update', 'delete', 'search', 'export')),
+    description TEXT,
+    UNIQUE(resource_type, operation)
+);
+
+CREATE TABLE role_permissions (
+    role_id UUID REFERENCES roles(id),
+    permission_id UUID REFERENCES permissions(id),
+    PRIMARY KEY (role_id, permission_id)
+);
+
+CREATE TABLE user_roles (
+    user_id UUID REFERENCES users(id),
+    role_id UUID REFERENCES roles(id),
+    assigned_at TIMESTAMPTZ DEFAULT now(),
+    assigned_by UUID REFERENCES users(id),
+    PRIMARY KEY (user_id, role_id)
+);
+```
+
+#### `allergy_intolerances`
+
+```sql
+CREATE TABLE allergy_intolerances (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id VARCHAR(100) NOT NULL,
+    patient_id UUID NOT NULL REFERENCES patients(id),
+    encounter_id UUID REFERENCES encounters(id),
+    clinical_status VARCHAR(20) NOT NULL CHECK (clinical_status IN ('active', 'inactive', 'resolved')),
+    verification_status VARCHAR(20) CHECK (verification_status IN ('unconfirmed', 'presumed', 'confirmed', 'refuted', 'entered-in-error')),
+    type VARCHAR(20) CHECK (type IN ('allergy', 'intolerance')),
+    category VARCHAR(20)[] CHECK (category <@ ARRAY['food', 'medication', 'environment', 'biologic']::VARCHAR[]),
+    criticality VARCHAR(20) CHECK (criticality IN ('low', 'high', 'unable-to-assess')),
+    code_system VARCHAR(100),
+    code VARCHAR(50),
+    code_display VARCHAR(500),
+    onset_datetime TIMESTAMPTZ,
+    recorded_date TIMESTAMPTZ DEFAULT now(),
+    recorder_id UUID REFERENCES users(id),
+    note TEXT,
+    reaction JSONB,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    version INTEGER DEFAULT 1
+);
+CREATE INDEX idx_allergy_patient_status ON allergy_intolerances(patient_id, clinical_status);
+```
+
+#### `clinical_notes`
+
+```sql
+CREATE TABLE clinical_notes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id VARCHAR(100) NOT NULL,
+    patient_id UUID NOT NULL REFERENCES patients(id),
+    encounter_id UUID REFERENCES encounters(id),
+    note_type VARCHAR(50) NOT NULL,
+    status VARCHAR(20) NOT NULL CHECK (status IN ('in-progress', 'preliminary', 'final', 'amended', 'entered-in-error')),
+    author_id UUID NOT NULL REFERENCES users(id),
+    content_encrypted BYTEA,
+    content_hash VARCHAR(64),
+    is_psychotherapy_note BOOLEAN DEFAULT FALSE,
+    is_42cfr_part2 BOOLEAN DEFAULT FALSE,
+    signed_at TIMESTAMPTZ,
+    signed_by UUID REFERENCES users(id),
+    signature BYTEA,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    version INTEGER DEFAULT 1
+);
+CREATE INDEX idx_notes_patient ON clinical_notes(patient_id, encounter_id);
+CREATE INDEX idx_notes_type ON clinical_notes(note_type, status);
+```
+
+#### `appointments`
+
+```sql
+CREATE TABLE appointments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id VARCHAR(100) NOT NULL,
+    patient_id UUID NOT NULL REFERENCES patients(id),
+    provider_id UUID NOT NULL REFERENCES users(id),
+    location_id UUID,
+    status VARCHAR(20) NOT NULL CHECK (status IN ('proposed', 'pending', 'booked', 'arrived', 'fulfilled', 'cancelled', 'noshow', 'entered-in-error', 'checked-in', 'waitlist')),
+    appointment_type VARCHAR(100),
+    reason_code VARCHAR(100),
+    start_time TIMESTAMPTZ NOT NULL,
+    end_time TIMESTAMPTZ NOT NULL,
+    duration_minutes INTEGER,
+    comment TEXT,
+    cancellation_reason TEXT,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    version INTEGER DEFAULT 1
+);
+CREATE INDEX idx_appt_provider_time ON appointments(provider_id, start_time);
+CREATE INDEX idx_appt_patient ON appointments(patient_id, start_time);
+CREATE INDEX idx_appt_status ON appointments(status, start_time);
+```
+
+#### `immunizations`
+
+```sql
+CREATE TABLE immunizations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id VARCHAR(100) NOT NULL,
+    patient_id UUID NOT NULL REFERENCES patients(id),
+    encounter_id UUID REFERENCES encounters(id),
+    status VARCHAR(20) NOT NULL CHECK (status IN ('completed', 'entered-in-error', 'not-done')),
+    vaccine_code VARCHAR(20) NOT NULL,
+    vaccine_code_system VARCHAR(100) DEFAULT 'http://hl7.org/fhir/sid/cvx',
+    vaccine_display VARCHAR(500),
+    occurrence_datetime TIMESTAMPTZ NOT NULL,
+    lot_number VARCHAR(50),
+    site_code VARCHAR(20),
+    route_code VARCHAR(20),
+    dose_quantity DECIMAL,
+    performer_id UUID REFERENCES users(id),
+    note TEXT,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    version INTEGER DEFAULT 1
+);
+CREATE INDEX idx_immunization_patient ON immunizations(patient_id, occurrence_datetime);
+```
+
+#### Additional Indexes for Existing Tables
+
+The following indexes are applied to tables defined in the ER diagram (Section
+2.3.2) that do not have separate DDL sections above. All of these tables also
+include `updated_at TIMESTAMPTZ DEFAULT now()` and `version INTEGER DEFAULT 1`
+columns for optimistic concurrency control.
+
+```sql
+-- conditions table
+CREATE INDEX idx_conditions_patient_status ON conditions(patient_id, clinical_status);
+
+-- medications table
+CREATE INDEX idx_medications_patient_status ON medications(patient_id, status);
+
+-- orders table
+CREATE INDEX idx_orders_patient_type ON orders(patient_id, order_type, status);
+CREATE INDEX idx_orders_requester ON orders(requester_id);
 ```
 
 ### 4.3 Indexing Strategy
@@ -1865,9 +2106,9 @@ infrastructure/
 
 | Tier               | Components                                   | RTO        | RPO        |
 |--------------------|----------------------------------------------|------------|------------|
-| **Tier 1** (Critical)| Patient lookup, clinical documentation, auth | 15 minutes | 1 second   |
-| **Tier 2** (High)    | Order entry, medication management           | 30 minutes | 5 seconds  |
-| **Tier 3** (Medium)  | Scheduling, notifications                    | 1 hour     | 1 minute   |
+| **Tier 1** (Critical)| Patient lookup, clinical documentation, auth | 15 minutes | 5 minutes  |
+| **Tier 2** (High)    | Order entry, medication management           | 30 minutes | 15 minutes |
+| **Tier 3** (Medium)  | Scheduling, notifications                    | 2 hours    | 1 hour     |
 | **Tier 4** (Low)     | Reporting, analytics, bulk export            | 4 hours    | 1 hour     |
 
 ### 7.2 Multi-AZ Strategy (Primary Region)
@@ -1960,6 +2201,34 @@ infrastructure/
 | Full region outage           | Manual DR failover via runbook             | 15-60 minutes|
 | Ransomware / data corruption | Restore from clean snapshot, forensics     | 1-4 hours    |
 | Secret compromise            | Rotate via Secrets Manager, redeploy       | 15-30 minutes|
+
+### 7.5 Cache Degradation Strategy
+
+When ElastiCache is unavailable or cold (e.g., after regional failover), all
+services MUST gracefully degrade by falling back to direct Aurora reads. Response
+latency may increase by 50--200ms during cache warming. Services MUST NOT fail
+or return errors if the cache is unavailable. Cache warming is automatic as
+requests flow through the system; no manual intervention is required.
+
+### 7.6 DR Testing Schedule
+
+| Test Type             | Frequency  | Success Criteria                                      | Owner          |
+|-----------------------|------------|-------------------------------------------------------|----------------|
+| Within-region failover| Monthly    | All Tier 1 services operational within 15 min RTO     | On-call SRE    |
+| Cross-region failover | Quarterly  | All tiers meet RTO targets, data integrity verified   | SRE Lead       |
+| Backup restoration    | Monthly    | Restore completes within 30 min, data integrity check | DBA            |
+| Audit trail continuity| Quarterly  | Zero gaps in audit trail across failover boundary     | Compliance     |
+
+DR test results are documented with timestamps, success/failure status, and
+remediation items. Failed tests generate P1 issues in the backlog.
+
+### 7.7 JWT Signing Key Replication
+
+JWT signing keys are replicated to the DR region via Secrets Manager cross-region
+secret replication. Both regions use identical signing key material to ensure
+tokens issued in the primary region validate in the DR region during failover.
+This prevents forced re-authentication during a clinical emergency. Key
+replication lag is monitored; replication failure triggers a P1 alert.
 
 ---
 
@@ -2154,6 +2423,116 @@ buffering and dead-letter handling.
   HTTP calls through the ALB.
 - SQS queues between EventBridge and consumers provide buffering, rate
   control, and dead-letter queues for failed processing.
+
+---
+
+### ADR-006: Schema-per-Tenant Multi-tenancy
+
+**Status:** Accepted
+
+**Context:** Multi-tenant SaaS serving healthcare organizations requires strong
+data isolation for PHI. Options considered: row-level isolation (tenant_id column
+on every table), schema-per-tenant (PostgreSQL search_path), and
+database-per-tenant (separate Aurora clusters).
+
+**Decision:** Use schema-per-tenant with PostgreSQL `search_path`, with a shared
+schema for cross-tenant platform tables (`tenants`, `global_config`,
+`tenant_users`).
+
+**Rationale:**
+
+| Criterion              | Row-Level Isolation    | Schema-per-Tenant      | Database-per-Tenant    |
+|------------------------|------------------------|------------------------|------------------------|
+| Data isolation strength| Weak (application-enforced) | Strong (schema boundary) | Strongest (DB boundary)|
+| Query performance      | Requires tenant_id in every query | Clean queries within schema | Clean queries |
+| Migration complexity   | Single migration       | Per-schema migration   | Per-database migration |
+| Tenant onboarding      | Instant (add row)      | Fast (create schema ~1s)| Slow (provision cluster)|
+| Tenant count limit     | Unlimited              | ~1,000 practical       | ~100 practical (cost)  |
+| Cross-tenant analytics | Easy                   | Possible via shared schema | Complex              |
+| Cost per tenant        | Lowest                 | Low                    | Highest                |
+| Regulatory compliance  | Requires RLS diligence | Schema-level isolation | Strongest separation   |
+
+**Consequences:**
+- Schema isolation prevents accidental cross-tenant data access even if
+  application code has bugs -- queries physically cannot reach another schema.
+- Database migrations must run per-schema, managed by a migration orchestrator.
+- Connection pooling is schema-aware (SET search_path per connection).
+- Schema names are validated via `_validate_schema_name()` regex to prevent
+  SQL injection in search_path statements.
+- RLS policies serve as defense-in-depth, not primary isolation mechanism.
+- If a tenant requires database-level isolation (e.g., government/military),
+  a dedicated Aurora cluster can be provisioned as an exception.
+
+---
+
+### ADR-007: DynamoDB for Sessions and Audit Hot Store
+
+**Status:** Accepted
+
+**Context:** Sessions require low-latency reads and automatic TTL-based
+expiration. Audit events require high-write-throughput ingestion with time-based
+queries and automatic archival.
+
+**Decision:** Use DynamoDB for session storage and the audit event hot store
+(90-day window). Aurora remains the long-term durable audit store.
+
+**Rationale:**
+
+| Criterion              | DynamoDB               | Aurora (sessions)      | Redis (sessions)       |
+|------------------------|------------------------|------------------------|------------------------|
+| TTL expiration         | Built-in, automatic    | Requires cron/trigger  | Built-in               |
+| Durability             | Multi-AZ, persistent   | Multi-AZ, persistent   | In-memory, volatile    |
+| Write throughput       | On-demand, auto-scale  | Connection-limited     | Very high (in-memory)  |
+| Cross-region (DR)      | Global Tables           | Global Database        | Global Datastore       |
+| Session persistence    | Survives restarts      | Survives restarts      | Lost on restart        |
+| Cost (write-heavy)     | Low (on-demand)        | Medium (Aurora IOPS)   | Medium (memory cost)   |
+
+**Consequences:**
+- Sessions survive Redis restarts (which was the primary concern with
+  Redis-only sessions for a healthcare system).
+- DynamoDB Global Tables provide cross-region session consistency for DR
+  failover without re-authentication.
+- Audit events MUST be confirmed written to Aurora before DynamoDB TTL eviction
+  to prevent data loss. A reconciliation job compares DynamoDB event IDs against
+  Aurora weekly.
+- Two query interfaces for audit data: DynamoDB for recent events (< 90 days),
+  Aurora for historical queries.
+
+---
+
+### ADR-008: Dual API Surface (REST + FHIR)
+
+**Status:** Accepted
+
+**Context:** The system needs both a clinician-facing API optimized for UI
+workflows and a standards-compliant FHIR R4 API for interoperability, ONC
+certification, and the 21st Century Cures Act.
+
+**Decision:** Maintain two API surfaces: `/api/v1/` (REST with custom schemas)
+and `/fhir/` (FHIR R4 with standard resources). Both read and write to the same
+underlying relational data store through a shared service layer.
+
+**Rationale:**
+- FHIR's resource model doesn't map efficiently to clinical UI needs (e.g.,
+  a patient chart view requires assembling 6+ FHIR resources).
+- The REST API can optimize for clinician workflows (fewer round-trips, custom
+  projections, bulk operations).
+- The FHIR API meets regulatory requirements (ONC, CMS Patient Access, Cures).
+- Maintaining both is less costly than forcing FHIR semantics on the UI or
+  building a FHIR-to-custom translation layer in the frontend.
+
+**Rules:**
+- Both surfaces share the same service layer and database transactions.
+- The FHIR gateway is a thin translation layer, not a separate data store.
+- SMART on FHIR scopes apply to `/fhir/` endpoints; `/api/v1/` uses RBAC.
+- Data written via `/api/v1/` is immediately readable via `/fhir/` and vice
+  versa.
+- Rate limits are unified across both surfaces (per-user, not per-surface).
+
+**Consequences:**
+- Dual surface increases API surface area to maintain and test.
+- Schema changes must be reflected in both REST schemas and FHIR mappings.
+- Security testing must cover both surfaces independently.
 
 ---
 

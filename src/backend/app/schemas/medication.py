@@ -51,3 +51,5 @@ class MedicationRequestResponse(BaseModel):
     end_date: Optional[date] = None
     refills: int
     created_at: datetime
+    updated_at: datetime
+    version: int

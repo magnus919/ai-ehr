@@ -6,7 +6,7 @@ import uuid
 from datetime import date, datetime, timezone
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Date, DateTime, String, Text, Uuid
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, Uuid
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -35,7 +35,18 @@ class Patient(Base):
     gender: Mapped[str] = mapped_column(
         String(20), nullable=False
     )  # male, female, other, unknown
+    sex_assigned_at_birth: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    gender_identity: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    sexual_orientation: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    race: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    ethnicity: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    preferred_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    preferred_language: Mapped[str | None] = mapped_column(String(35), nullable=True, default="en")
+    ssn_hmac: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     ssn_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    emergency_contact: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    preferred_pharmacy_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    fhir_id: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
     address: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     email: Mapped[str | None] = mapped_column(String(320), nullable=True)
@@ -51,6 +62,10 @@ class Patient(Base):
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
+    )
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id"), nullable=True
     )
 
     # Relationships

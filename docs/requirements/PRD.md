@@ -3,7 +3,7 @@
 | Field              | Value                                      |
 |--------------------|--------------------------------------------|
 | **Document ID**    | OMR-PRD-2026-001                           |
-| **Version**        | 1.0.0                                      |
+| **Version**        | 1.1.0                                      |
 | **Status**         | Draft                                      |
 | **Author**         | OpenMedRecord Product Team                 |
 | **Created**        | 2026-02-11                                 |
@@ -19,6 +19,7 @@
 |---------|------------|------------------------------|--------------------------|
 | 0.1.0   | 2026-02-11 | OpenMedRecord Product Team   | Initial outline          |
 | 1.0.0   | 2026-02-11 | OpenMedRecord Product Team   | First complete draft     |
+| 1.1.0   | 2026-02-11 | OpenMedRecord Product Team   | Incorporated findings from architecture, security, and tech lead reviews. Added missing epics. Reconciled cross-document inconsistencies. |
 
 ---
 
@@ -53,7 +54,7 @@ OpenMedRecord addresses these challenges by providing:
 
 - **Open-source licensing (Apache 2.0)** -- eliminating per-provider licensing fees and enabling community-driven innovation.
 - **HIPAA, SOC 2 Type II, and HITRUST CSF compliance** -- meeting the security and privacy requirements of healthcare organizations of all sizes.
-- **AWS-native cloud architecture** -- leveraging managed services for reliability, scalability, and operational efficiency while remaining deployable on-premises or in other cloud environments via containerization.
+- **AWS-native cloud architecture** -- leveraging managed services for reliability, scalability, and operational efficiency while remaining deployable on-premises or in other cloud environments via Docker containers, though some features (KMS, Cognito, HealthLake) require equivalent substitutions outside AWS.
 - **FHIR R4 interoperability as a first-class concern** -- implementing US Core Implementation Guide profiles, SMART on FHIR for third-party application integration, and Bulk Data Access for population-health workflows.
 - **Clinician-centered UX** -- designed from the ground up with clinician workflow efficiency as the primary design constraint.
 
@@ -103,10 +104,11 @@ Deliver a production-ready, ONC-certifiable EHR platform that healthcare organiz
 1. **Safety first** -- every feature is evaluated against its potential to cause patient harm; clinical decision support and fail-safes are not optional.
 2. **Clinician time is sacred** -- minimize clicks, reduce context switches, and surface the right information at the right time.
 3. **Standards over custom** -- prefer HL7 FHIR, SNOMED CT, RxNorm, LOINC, ICD-10, and CPT over proprietary data models.
-4. **Secure by default** -- encryption at rest and in transit, least-privilege access, and comprehensive audit logging are non-negotiable baseline behaviors.
-5. **Composable architecture** -- the system is built from loosely coupled services with well-defined APIs, enabling replacement or extension of any component.
-6. **Accessibility is not an afterthought** -- the UI meets WCAG 2.1 AA and is usable by clinicians with disabilities.
-7. **Operational transparency** -- structured logging, distributed tracing, and real-time dashboards give operators full visibility.
+4. **FHIR-First (not FHIR-Native)** -- the system uses a relational data model optimized for clinical workflows with a FHIR R4 facade for interoperability. Internal services use domain-specific models; FHIR translation occurs at the API boundary.
+5. **Secure by default** -- encryption at rest and in transit, least-privilege access, and comprehensive audit logging are non-negotiable baseline behaviors.
+6. **Composable architecture** -- the system is built from loosely coupled services with well-defined APIs, enabling replacement or extension of any component.
+7. **Accessibility is not an afterthought** -- the UI meets WCAG 2.1 AA and is usable by clinicians with disabilities.
+8. **Operational transparency** -- structured logging, distributed tracing, and real-time dashboards give operators full visibility.
 
 ### 2.5 Success Criteria
 
@@ -114,7 +116,7 @@ The product will be considered successful when:
 
 - It passes ONC Health IT Certification testing.
 - At least three independent healthcare organizations operate it in production for six months with zero critical-severity compliance findings.
-- Clinician satisfaction scores (measured via System Usability Scale) exceed 75 (above-average).
+- Clinician satisfaction scores (measured via System Usability Scale) exceed 68 (industry average) with a target of 75+ within 12 months post-GA, measured via quarterly SUS surveys of active clinical users.
 - The open-source community has merged pull requests from at least 20 external contributors.
 
 ---
@@ -783,7 +785,7 @@ User stories are organized by epic. Each story follows the format: *"As a [perso
 
 **Acceptance Criteria:**
 - MFA is enforced for all users by default; it can be required per role.
-- Supported MFA methods: TOTP (authenticator app), FIDO2/WebAuthn (hardware key), and SMS (as fallback only).
+- Supported MFA methods: TOTP (authenticator app), FIDO2/WebAuthn (hardware key), and push notifications via authenticator apps. SMS is explicitly excluded as an MFA factor per NIST SP 800-63B guidance due to known vulnerabilities in SMS delivery (SIM-swap, SS7 interception).
 - MFA is required at initial login and optionally at session resumption after idle timeout.
 - EPCS workflows require FIPS 140-2 validated MFA.
 
@@ -806,7 +808,8 @@ User stories are organized by epic. Each story follows the format: *"As a [perso
 **Acceptance Criteria:**
 - Break-the-glass is available only when normal access is denied.
 - The user must provide a reason (selected from a predefined list: emergency care, on-call coverage, public health, etc.) before access is granted.
-- Break-the-glass access is time-limited (configurable, default: 4 hours).
+- Break-the-glass access is time-limited (default: 60 minutes; configurable maximum of 4 hours requiring security officer approval).
+- Periodic re-authentication is required every 30 minutes during an active break-the-glass session.
 - The access event is flagged in the audit log and immediately reported to the compliance team.
 - Reporting provides: user identity, patient accessed, reason given, and duration of access.
 
@@ -900,6 +903,183 @@ User stories are organized by epic. Each story follows the format: *"As a [perso
 
 ---
 
+### Epic 12: Vital Signs Documentation
+
+#### US-VS-001: Vital Signs Entry
+
+**As a** nurse, **I want to** document a patient's vital signs during intake and throughout the encounter **so that** clinicians have current physiological measurements for clinical decision-making.
+
+**Acceptance Criteria:**
+- The vital signs form captures: height, weight, BMI (auto-calculated from height and weight), blood pressure (systolic and diastolic), heart rate, respiratory rate, temperature, pulse oximetry (SpO2), and pain score (0--10 scale).
+- BMI is automatically calculated and displayed when both height and weight are entered.
+- All vital signs are recorded with the measurement date/time and the documenting user.
+- Vital signs outside configurable normal ranges are flagged with visual indicators (color coding and icons).
+- Vital signs are persisted as FHIR Observation resources per USCDI v3 data classes.
+- Vital signs entry supports both metric and imperial units with automatic conversion.
+
+#### US-VS-002: Vital Signs Trending
+
+**As a** physician, **I want to** view vital signs trends over time with configurable date ranges and abnormal value alerts **so that** I can identify clinically significant changes in the patient's condition.
+
+**Acceptance Criteria:**
+- Vital signs are displayed in both tabular and graphical (trend line) formats.
+- Date ranges are configurable (last visit, 30 days, 90 days, 1 year, all).
+- Normal ranges are configurable per patient age, sex, and clinical context.
+- Values outside normal ranges are highlighted in both tabular and graphical views.
+- Trend charts support overlay of multiple vital sign types for correlation analysis.
+- Trending data is available within the encounter workflow and as a standalone chart section.
+
+---
+
+### Epic 13: Encounter Management
+
+#### US-ENC-001: Encounter Creation and Management
+
+**As a** clinician, **I want to** create and manage patient encounters/visits **so that** clinical activities are organized within the context of a specific patient interaction.
+
+**Acceptance Criteria:**
+- Encounters are created with: patient, encounter type (office visit, telehealth, phone, etc.), date/time, participating providers, location, and chief complaint.
+- Encounter status follows a defined workflow: planned -> arrived -> in-progress -> finished -> cancelled.
+- Status transitions are validated (e.g., cannot transition from cancelled to in-progress).
+- Encounters are linked to the originating appointment (if applicable).
+- Encounters are persisted as FHIR Encounter resources.
+
+#### US-ENC-002: Encounter Documentation
+
+**As a** clinician, **I want to** associate clinical documentation (chief complaint, diagnoses, procedures, orders, and notes) with a specific encounter **so that** all clinical activities for a visit are traceable and organized.
+
+**Acceptance Criteria:**
+- Chief complaint and encounter type are captured at encounter creation or check-in.
+- Diagnoses (FHIR Condition), procedures (FHIR Procedure), observations (FHIR Observation), orders (FHIR MedicationRequest, ServiceRequest), and notes (FHIR DocumentReference) can be associated with the encounter.
+- The encounter summary view displays all associated clinical data in a consolidated timeline.
+- Encounter diagnoses are distinguishable from problem list conditions.
+
+---
+
+### Epic 14: Immunization Management
+
+#### US-IMM-001: Immunization Recording
+
+**As a** nurse, **I want to** record administered immunizations with complete administration details **so that** the patient's immunization record is accurate and reportable.
+
+**Acceptance Criteria:**
+- Immunization records capture: vaccine code (CVX), manufacturer (MVX), lot number, expiration date, administration site, route, dose quantity, administering provider, and date administered.
+- Vaccine Inventory System (VIS) date and edition are recorded.
+- Contraindications and refusals are documented with reason codes.
+- Administered immunizations are reported to state immunization registries via HL7v2 VXU^V04.
+- Immunization records are persisted as FHIR Immunization resources.
+
+#### US-IMM-002: Immunization History and Forecasting
+
+**As a** physician, **I want to** view a patient's immunization history and see recommended/overdue vaccines **so that** I can ensure the patient is up to date on recommended immunizations.
+
+**Acceptance Criteria:**
+- Immunization history displays all recorded and externally sourced (registry query) immunizations in chronological order.
+- Immunization forecasts are generated based on the CDC immunization schedule (ACIP recommendations), patient age, and prior immunization history.
+- Overdue immunizations are highlighted with aging indicators.
+- Forecasting accounts for catch-up schedules and contraindications.
+- The immunization record is printable for school/employer requirements.
+
+---
+
+### Epic 15: User and Role Management
+
+#### US-UM-001: User Account Management
+
+**As a** system administrator, **I want to** create, update, and deactivate user accounts with appropriate role assignments **so that** users have the access they need and former users are promptly deprovisioned.
+
+**Acceptance Criteria:**
+- User accounts are created with: name, email, role(s), department, credential type, NPI (if applicable), and supervisor.
+- Role assignment follows the principle of least privilege; users are assigned only the roles necessary for their job function.
+- Account deactivation immediately revokes all active sessions and prevents future login.
+- User provisioning follows a workflow requiring manager approval before account activation.
+- All user account changes are logged in the audit trail.
+
+#### US-UM-002: Custom Role and Permission Management
+
+**As a** system administrator, **I want to** define custom roles with granular permissions **so that** the access control model reflects the organization's unique workflow requirements.
+
+**Acceptance Criteria:**
+- Custom roles can be created with any combination of resource-level (e.g., patient, encounter, medication) and operation-level (e.g., read, write, delete, sign) permissions.
+- Permissions are managed via a junction table model supporting many-to-many relationships between roles and permissions.
+- Role changes take effect immediately for all users assigned to the modified role.
+- A role comparison view shows the permission differences between any two roles.
+- Default system roles cannot be deleted but can be cloned and customized.
+
+#### US-UM-003: Quarterly Access Reviews
+
+**As a** compliance officer, **I want to** conduct automated quarterly access reviews **so that** user access remains appropriate and excessive permissions are identified and remediated.
+
+**Acceptance Criteria:**
+- The system generates a quarterly access review report listing all users, their roles, and last login date.
+- Users who have not logged in within 90 days are flagged for deactivation review.
+- Department managers receive automated notifications to certify their team members' access.
+- Uncertified accounts are automatically escalated to the security team after a configurable review period (default: 14 days).
+- Access review completion status and results are retained for compliance audit purposes.
+
+---
+
+### Epic 16: Consent Management
+
+#### US-CON-001: Consent Recording
+
+**As a** administrative staff member, **I want to** record patient consent for treatment, data sharing, and research **so that** the organization has documented authorization for specific uses of the patient's health information.
+
+**Acceptance Criteria:**
+- Consent records capture: consent type (treatment, data sharing, research, marketing), scope (entire record, specific data categories, specific providers), effective period, and patient signature.
+- Consent is recorded as a FHIR Consent resource with granular scope definitions.
+- Electronic signature capture is supported with identity verification.
+- Consent forms are configurable per organizational policy and regulatory requirements.
+
+#### US-CON-002: Consent Enforcement
+
+**As a** system administrator, **I want to** enforce consent decisions at the point of data access **so that** patient data is only shared in accordance with their documented consent.
+
+**Acceptance Criteria:**
+- The consent evaluation engine is integrated at the data access layer, evaluating consent status before returning data.
+- Data access requests for patients without active consent for the requested purpose are denied with a clear indication to the requesting user.
+- Consent enforcement applies to FHIR API access, C-CDA exports, bulk data exports, and inter-system data sharing.
+- Override is available only via break-the-glass for emergency situations.
+
+#### US-CON-003: Consent Withdrawal
+
+**As a** patient, **I want to** withdraw my consent for data sharing with immediate effect **so that** my health information is no longer shared with parties I no longer authorize.
+
+**Acceptance Criteria:**
+- Consent withdrawal can be initiated via the patient portal or in-person with staff assistance.
+- Withdrawal takes effect immediately upon confirmation; subsequent data access requests are denied for the withdrawn scope.
+- Prior disclosures made under the original consent remain valid and are documented in the accounting of disclosures.
+- The patient receives confirmation of the withdrawal with a summary of its scope and effect.
+
+#### US-CON-004: 42 CFR Part 2 Consent Workflow (P1, Phase 2)
+
+**As a** clinician, **I want to** manage consent for substance use disorder (SUD) treatment records in compliance with 42 CFR Part 2 **so that** SUD records receive the enhanced protections required by federal law.
+
+**Acceptance Criteria:**
+- The 42 CFR Part 2 consent form includes all required elements per 42 CFR 2.31: name of patient, specific purpose of disclosure, how much and what kind of information to be disclosed, name of recipient, patient signature, date, and right to revoke.
+- Part 2 consent is managed separately from general treatment consent.
+- Re-disclosure prohibition notices are automatically appended to any output (printed, exported, transmitted) containing Part 2 protected data.
+- Part 2 data is segmented and access-controlled independently from standard clinical data.
+- Consent expiration is tracked with automated notifications for renewal.
+
+---
+
+### Epic 17: Psychotherapy Notes Protection (P1, Phase 2)
+
+#### US-PSY-001: Psychotherapy Notes Classification
+
+**As a** compliance officer, **I want to** ensure psychotherapy notes are classified and stored as a distinct data category per HIPAA 164.508(a)(2) **so that** they receive enhanced protections separate from standard clinical documentation.
+
+**Acceptance Criteria:**
+- Psychotherapy notes are classified as a distinct data type, separate from standard clinical progress notes.
+- Psychotherapy notes are stored in a separate, access-controlled data store (or logical partition) from standard clinical notes.
+- Authorization for psychotherapy notes requires a specific, patient-signed authorization per HIPAA 164.508(a)(2); standard TPO (Treatment, Payment, Operations) consent does not grant access.
+- Psychotherapy notes are excluded from standard record disclosures, patient portal access, C-CDA exports, FHIR bulk data exports, and responses to subpoenas unless accompanied by specific authorization or court order.
+- Access to psychotherapy notes is restricted to the authoring clinician and explicitly authorized individuals.
+- All access to psychotherapy notes is logged as a distinct audit event category.
+
+---
+
 ## 5. Functional Requirements
 
 Requirements are identified with a unique ID (FR-XXX), grouped by module, and prioritized:
@@ -917,7 +1097,7 @@ Requirements are identified with a unique ID (FR-XXX), grouped by module, and pr
 |----|-------------|----------|------------|
 | FR-001 | The system shall allow creation of patient records with demographics compliant with USCDI v3. | P0 | US-PM-001 |
 | FR-002 | The system shall generate a unique MRN for each patient upon registration. | P0 | US-PM-001 |
-| FR-003 | The system shall perform automatic duplicate detection during patient creation using probabilistic matching on name, DOB, and SSN. | P0 | US-PM-001 |
+| FR-003 | The system shall perform automatic duplicate detection during patient creation using probabilistic patient matching with a weighted scoring algorithm and configurable thresholds. Minimum match fields: last name, first name, date of birth, SSN (exact match via HMAC). Match score >= 0.85 = auto-link; 0.65--0.85 = manual review; < 0.65 = new record. False positive rate target: < 1%. | P0 | US-PM-001 |
 | FR-004 | The system shall support patient search by name (partial, phonetic), DOB, MRN, SSN, and phone number with results returned in under 500ms. | P0 | US-PM-002 |
 | FR-005 | The system shall maintain a versioned history of all demographic changes with user attribution. | P0 | US-PM-003 |
 | FR-006 | The system shall support primary, secondary, and tertiary insurance coverage records per patient. | P0 | US-PM-004 |
@@ -1057,6 +1237,52 @@ Requirements are identified with a unique ID (FR-XXX), grouped by module, and pr
 | FR-090 | The system shall support IHE integration profiles (XDS.b, XCA, PDQ, PIX) for HIE connectivity. | P2 | US-INT-006 |
 | FR-091 | The system shall publish a FHIR CapabilityStatement at the `/metadata` endpoint. | P0 | US-INT-001 |
 
+### 5.12 Vital Signs Documentation
+
+| ID | Requirement | Priority | User Story |
+|----|-------------|----------|------------|
+| FR-VS-001 | The system shall record and display vital signs (height, weight, BMI, blood pressure, heart rate, respiratory rate, temperature, pulse oximetry, pain score) per USCDI v3 data classes, persisted as FHIR Observation resources. | P0 | US-VS-001 |
+| FR-VS-002 | The system shall auto-calculate BMI from height and weight entries and display the result immediately. | P0 | US-VS-001 |
+| FR-VS-003 | The system shall flag vital signs outside configurable normal ranges (based on patient age, sex, and clinical context) with visual indicators and optional CDS alerts. | P0 | US-VS-001, US-VS-002 |
+
+### 5.13 Encounter Management
+
+| ID | Requirement | Priority | User Story |
+|----|-------------|----------|------------|
+| FR-ENC-001 | The system shall support creation, reading, and updating of encounters with a status workflow (planned -> arrived -> in-progress -> finished -> cancelled) and validated status transitions. | P0 | US-ENC-001 |
+| FR-ENC-002 | The system shall associate observations, conditions, medication requests, service requests, procedures, and clinical notes with encounters via FHIR resource references. | P0 | US-ENC-002 |
+
+### 5.14 Immunization Management
+
+| ID | Requirement | Priority | User Story |
+|----|-------------|----------|------------|
+| FR-IMM-001 | The system shall support CRUD operations for immunization records per CVX (vaccine administered) and MVX (vaccine manufacturer) code sets, persisted as FHIR Immunization resources. | P1 | US-IMM-001 |
+| FR-IMM-002 | The system shall generate immunization forecasts based on the CDC immunization schedule (ACIP recommendations), accounting for patient age, prior immunization history, catch-up schedules, and documented contraindications. | P1 | US-IMM-002 |
+
+### 5.15 User and Role Management
+
+| ID | Requirement | Priority | User Story |
+|----|-------------|----------|------------|
+| FR-UM-001 | The system shall support user CRUD operations with role assignment via junction tables, supporting many-to-many relationships between users and roles. | P0 | US-UM-001 |
+| FR-UM-002 | The system shall implement a permission model supporting resource-level (e.g., patient, encounter, medication) and operation-level (e.g., read, write, delete, sign) grants. | P0 | US-UM-002 |
+| FR-UM-003 | The system shall enforce a user provisioning workflow with manager approval before account activation. | P0 | US-UM-001 |
+
+### 5.16 Consent Management
+
+| ID | Requirement | Priority | User Story |
+|----|-------------|----------|------------|
+| FR-CON-001 | The system shall support FHIR Consent resources with granular scope definitions (consent type, data categories, authorized recipients, effective period). | P0 | US-CON-001 |
+| FR-CON-002 | The system shall evaluate consent status at the data access layer, denying requests that lack active consent for the requested purpose and scope. | P0 | US-CON-002 |
+| FR-CON-003 | The system shall support 42 CFR Part 2 consent workflows with all required elements per 42 CFR 2.31 (patient name, purpose of disclosure, information scope, recipient name, patient signature, date, right to revoke). | P1 | US-CON-004 |
+| FR-CON-004 | The system shall automatically append re-disclosure prohibition notices to any output (printed, exported, transmitted) containing 42 CFR Part 2 protected data. | P1 | US-CON-004 |
+
+### 5.17 Psychotherapy Notes Protection
+
+| ID | Requirement | Priority | User Story |
+|----|-------------|----------|------------|
+| FR-PSY-001 | The system shall classify psychotherapy notes as a distinct data category per HIPAA 164.508(a)(2) with separate storage and authorization from standard clinical notes. | P1 | US-PSY-001 |
+| FR-PSY-002 | The system shall exclude psychotherapy notes from standard TPO disclosures, patient portal access, C-CDA exports, FHIR bulk data exports, and general record requests unless accompanied by patient-specific authorization or court order. | P1 | US-PSY-001 |
+
 ---
 
 ## 6. Non-Functional Requirements
@@ -1083,7 +1309,7 @@ Requirements are identified with a unique ID (FR-XXX), grouped by module, and pr
 |----|-------------|--------|----------|
 | NFR-012 | Horizontal scaling of API and application tiers | Auto-scaling based on CPU/memory/request-rate thresholds | P0 |
 | NFR-013 | Database scaling | Read replicas for query workloads; write throughput supporting 5,000 transactions per second | P0 |
-| NFR-014 | Multi-tenancy | Logical tenant isolation with tenant-specific encryption keys | P1 |
+| NFR-014 | Multi-tenancy | The system supports multi-tenant deployment with schema-per-tenant data isolation in PostgreSQL. Each tenant has an isolated database schema. Cross-tenant data access is prevented at the database level. Tenant-specific encryption keys via AWS KMS. | P1 |
 | NFR-015 | Storage scaling | Object storage for documents and images with no practical upper limit | P0 |
 | NFR-016 | Message queue scaling | Auto-scaling consumers for HL7v2, FHIR subscriptions, and event processing | P1 |
 
@@ -1093,7 +1319,7 @@ Requirements are identified with a unique ID (FR-XXX), grouped by module, and pr
 |----|-------------|--------|----------|
 | NFR-017 | Encryption at rest | AES-256 using AWS KMS with customer-managed CMKs | P0 |
 | NFR-018 | Encryption in transit | TLS 1.2 minimum; TLS 1.3 preferred | P0 |
-| NFR-019 | Authentication | SAML 2.0 and OpenID Connect federation; local credential store with bcrypt/argon2 | P0 |
+| NFR-019 | Authentication | SAML 2.0 and OpenID Connect federation; local credential store with Argon2id password hashing | P0 |
 | NFR-020 | Authorization | OAuth 2.0 with SMART scopes; RBAC with attribute-based overrides | P0 |
 | NFR-021 | Secret management | All secrets stored in AWS Secrets Manager; no secrets in code, config, or environment variables | P0 |
 | NFR-022 | Vulnerability scanning | Automated SAST, DAST, and dependency scanning in CI/CD; critical/high findings block deployment | P0 |
@@ -1118,8 +1344,8 @@ Requirements are identified with a unique ID (FR-XXX), grouped by module, and pr
 | ID | Requirement | Target | Priority |
 |----|-------------|--------|----------|
 | NFR-033 | Availability SLA | 99.9% uptime (measured monthly, excluding planned maintenance) | P0 |
-| NFR-034 | Recovery Time Objective (RTO) | < 1 hour for full system recovery | P0 |
-| NFR-035 | Recovery Point Objective (RPO) | < 15 minutes (no more than 15 minutes of data loss) | P0 |
+| NFR-034 | Recovery Time Objective (RTO) | Tiered model: Tier 1 (Clinical Services) < 15 min; Tier 2 (Supporting Services) < 30 min; Tier 3 (Non-Clinical) < 2 hours; Tier 4 (Batch/Reporting) < 4 hours | P0 |
+| NFR-035 | Recovery Point Objective (RPO) | Tiered model: Tier 1 (Clinical Services) < 5 min; Tier 2 (Supporting Services) < 15 min; Tier 3 (Non-Clinical) < 1 hour; Tier 4 (Batch/Reporting) < 1 hour | P0 |
 | NFR-036 | Backup frequency | Continuous replication for database; hourly snapshots for file storage | P0 |
 | NFR-037 | Backup testing | Monthly restore test with documented results | P0 |
 | NFR-038 | Multi-AZ deployment | All critical services deployed across at least 2 AWS Availability Zones | P0 |
@@ -1137,7 +1363,7 @@ Requirements are identified with a unique ID (FR-XXX), grouped by module, and pr
 | NFR-045 | Color contrast | Minimum 4.5:1 contrast ratio for normal text; 3:1 for large text | P0 |
 | NFR-046 | Browser support | Chrome (latest 2), Firefox (latest 2), Safari (latest 2), Edge (latest 2) | P0 |
 | NFR-047 | Localization readiness | UI framework supports i18n; initial release in English with Spanish as Phase 2 | P1 |
-| NFR-048 | System Usability Scale (SUS) | Target score of 75+ (above average) in clinician usability testing | P0 |
+| NFR-048 | System Usability Scale (SUS) | Exceed 68 (industry average) at GA; target 75+ within 12 months post-GA, measured via quarterly SUS surveys of active clinical users | P0 |
 
 ### 6.7 Interoperability Standards
 
@@ -1258,7 +1484,7 @@ Provenance (FHIR: Provenance) [Cross-cutting]
 | PHI access logging | Every read/write to a PHI-containing resource generates an AuditEvent |
 | PHI disposal | Cryptographic erasure (key destruction) for logical deletion; physical media destruction per NIST SP 800-88 |
 | Minimum Necessary | API responses filtered to the minimum data set required for the requestor's purpose and scope |
-| Patient right to access | FHIR Patient Access API and C-CDA export; response within 15 calendar days |
+| Patient right to access | FHIR Patient Access API (real-time programmatic access) and C-CDA export; manual or non-standard format requests fulfilled within 30 days per HIPAA 164.524(b)(2) |
 | Patient right to amend | Amendment request workflow with clinician review; both original and amended data retained |
 | Accounting of disclosures | Disclosure events logged and reportable for 6 years per HIPAA |
 | Business Associate Agreements | All third-party services processing PHI must have executed BAAs; tracked in compliance system |
@@ -1273,7 +1499,8 @@ Provenance (FHIR: Provenance) [Cross-cutting]
 | LOINC | Laboratory tests, clinical observations | Regenstrief Institute |
 | RxNorm | Medications | NLM |
 | NDC | Drug products | FDA |
-| CVX | Vaccine codes | CDC |
+| CVX | Vaccine codes (vaccines administered) | CDC |
+| MVX | Vaccine manufacturer codes | CDC |
 | HCPCS | Supplies, services | CMS |
 | NUBC Revenue Codes | Billing | NUBC |
 
@@ -1345,6 +1572,7 @@ Scopes: SMART on FHIR v2 scopes
 |-------------|------------|-------------|
 | Patient-facing app | 60 requests/minute | 10 requests/second |
 | Clinician-facing app | 300 requests/minute | 30 requests/second |
+| SMART on FHIR app | 300 requests/minute (inherits from user context) | 30 requests/second |
 | Backend service | 1,000 requests/minute | 100 requests/second |
 | Bulk Data export | 10 concurrent exports; 1M resources per export |  |
 
@@ -1437,7 +1665,7 @@ Scopes: SMART on FHIR v2 scopes
 | Person or entity authentication | 164.312(d) | MFA for all users; FIPS 140-2 for EPCS; SAML/OIDC federation | FR-076, NFR-019 |
 | Workforce security | 164.308(a)(3) | Role-based access; onboarding/offboarding workflows; access reviews | FR-075 |
 | Security incident procedures | 164.308(a)(6) | Automated anomaly detection; incident response playbooks; breach notification workflow | NFR-022, NFR-023 |
-| Contingency plan | 164.308(a)(7) | Multi-AZ deployment; automated backups; tested DR procedures; RTO < 1hr, RPO < 15min | NFR-034, NFR-035, NFR-036, NFR-037, NFR-038 |
+| Contingency plan | 164.308(a)(7) | Multi-AZ deployment; automated backups; tested DR procedures; tiered RTO/RPO (Tier 1 Clinical: RTO < 15min, RPO < 5min) | NFR-034, NFR-035, NFR-036, NFR-037, NFR-038 |
 | Business associate contracts | 164.308(b)(1) | BAA tracking system; all third-party services with PHI access have executed BAAs | Operational |
 | Facility access controls | 164.310(a)(1) | AWS data center physical security (SOC 2 Type II certified) | Infrastructure |
 | Workstation security | 164.310(b) | Session timeout; screen lock; device policy enforcement | FR-079 |
@@ -1459,7 +1687,7 @@ Scopes: SMART on FHIR v2 scopes
 | | CC7.4 - Respond to incidents | Incident response playbook; breach notification procedures; forensic capabilities | Operational |
 | **Availability** | A1.1 - Availability commitments | 99.9% SLA; multi-AZ deployment; auto-scaling | NFR-033, NFR-038 |
 | | A1.2 - Environmental protections | AWS managed infrastructure; multi-AZ; automated failover | NFR-038 |
-| | A1.3 - Recovery procedures | Tested backup/restore; RTO < 1hr; RPO < 15min | NFR-034, NFR-035, NFR-037 |
+| | A1.3 - Recovery procedures | Tested backup/restore; tiered RTO/RPO (Tier 1 Clinical: RTO < 15min, RPO < 5min) | NFR-034, NFR-035, NFR-037 |
 | **Processing Integrity** | PI1.1 - Complete and accurate processing | Data validation; referential integrity; FHIR profile validation | FR-010, FR-033 |
 | **Confidentiality** | C1.1 - Confidential information identification | PHI classification tags; data dictionary; sensitivity levels | NFR-025 |
 | | C1.2 - Confidential information disposal | Cryptographic erasure; retention policy enforcement; automated lifecycle management | Section 7.3 |
@@ -1520,9 +1748,13 @@ Scopes: SMART on FHIR v2 scopes
 |--------|-------------|------------------|
 | **Patient Management** | Registration, search, demographics, insurance (manual verification), duplicate detection | FR-001 through FR-006, FR-010 |
 | **Clinical Documentation** | SOAP notes, pre-built templates, note signing with MFA, addendums, problem list, allergy list | FR-011 through FR-015, FR-017 through FR-019, FR-022 through FR-024 |
+| **Vital Signs** | Vital signs entry with auto-calculated BMI, abnormal value flagging, trend charting | FR-VS-001, FR-VS-002, FR-VS-003 |
+| **Encounter Management** | Encounter creation, status workflow, clinical data association | FR-ENC-001, FR-ENC-002 |
 | **Basic Order Entry** | Medication orders with drug interaction checking, laboratory orders | FR-025 through FR-027, FR-033 |
 | **Scheduling** | Appointment scheduling, rescheduling, cancellation, automated reminders | FR-041 through FR-044, FR-048 |
 | **Security & Access Control** | RBAC, MFA, audit trail, break-the-glass, session management, encryption | FR-075 through FR-082 |
+| **User & Role Management** | User CRUD, custom roles with granular permissions, provisioning workflow, quarterly access reviews | FR-UM-001, FR-UM-002, FR-UM-003 |
+| **Consent Management (General)** | Consent recording, enforcement at data access layer, consent withdrawal | FR-CON-001, FR-CON-002 |
 | **Interoperability (Foundation)** | FHIR R4 API (US Core), SMART on FHIR authorization, CapabilityStatement | FR-083, FR-084, FR-091 |
 | **Infrastructure** | AWS deployment (multi-AZ), CI/CD pipeline, monitoring, backup/restore | NFR-001 through NFR-006, NFR-012, NFR-017, NFR-018, NFR-033 through NFR-038 |
 
@@ -1571,6 +1803,9 @@ Scopes: SMART on FHIR v2 scopes
 | **Co-signature** | Supervised clinician signature workflows | FR-020 |
 | **Insurance Verification** | Real-time X12 270/271 eligibility checking | FR-007 |
 | **Patient Merge** | Full duplicate merge with reversibility | FR-008 |
+| **Immunization Management** | Immunization recording with CVX/MVX codes, history, forecasting per CDC schedule | FR-IMM-001, FR-IMM-002 |
+| **Consent Management (42 CFR Part 2)** | SUD consent workflows per 42 CFR 2.31, re-disclosure prohibition notices | FR-CON-003, FR-CON-004 |
+| **Psychotherapy Notes** | Distinct data classification, separate storage, exclusion from standard disclosures and bulk exports | FR-PSY-001, FR-PSY-002 |
 
 #### Phase 2 Milestones
 

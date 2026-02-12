@@ -17,7 +17,22 @@ from fastapi.responses import ORJSONResponse
 
 from app.api.middleware.audit import AuditMiddleware
 from app.api.middleware.tenant import TenantMiddleware
-from app.api.routes import appointments, auth, encounters, fhir, orders, patients
+from app.api.routes import (
+    allergies,
+    appointments,
+    audit_logs,
+    auth,
+    clinical_notes,
+    conditions,
+    consents,
+    encounters,
+    fhir,
+    immunizations,
+    observations,
+    orders,
+    patients,
+    users,
+)
 from app.core.config import settings
 from app.core.database import dispose_engine, init_db
 
@@ -107,6 +122,14 @@ app.include_router(patients.router, prefix=API_V1)
 app.include_router(encounters.router, prefix=API_V1)
 app.include_router(orders.router, prefix=API_V1)
 app.include_router(appointments.router, prefix=API_V1)
+app.include_router(allergies.router, prefix=API_V1)
+app.include_router(observations.router, prefix=API_V1)
+app.include_router(conditions.router, prefix=API_V1)
+app.include_router(clinical_notes.router, prefix=API_V1)
+app.include_router(immunizations.router, prefix=API_V1)
+app.include_router(users.router, prefix=API_V1)
+app.include_router(consents.router, prefix=API_V1)
+app.include_router(audit_logs.router, prefix=API_V1)
 app.include_router(fhir.router)  # FHIR routes live at /fhir/*
 
 

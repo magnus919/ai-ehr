@@ -52,6 +52,7 @@ class UserResponse(BaseModel):
     mfa_enabled: bool
     last_login: Optional[datetime] = None
     created_at: datetime
+    updated_at: datetime
 
 
 class LoginRequest(BaseModel):

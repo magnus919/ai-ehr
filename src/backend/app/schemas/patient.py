@@ -17,9 +17,17 @@ class PatientCreate(BaseModel):
     last_name: str = Field(..., min_length=1, max_length=100)
     dob: date
     gender: str = Field(..., pattern=r"^(male|female|other|unknown)$")
+    sex_assigned_at_birth: Optional[str] = Field(None, pattern=r"^(male|female|unknown)$")
+    gender_identity: Optional[str] = Field(None, max_length=50)
+    sexual_orientation: Optional[str] = Field(None, max_length=50)
+    race: Optional[str] = Field(None, max_length=100)
+    ethnicity: Optional[str] = Field(None, max_length=100)
+    preferred_name: Optional[str] = Field(None, max_length=100)
+    preferred_language: Optional[str] = Field("en", max_length=35)
     ssn: Optional[str] = Field(
         None, pattern=r"^\d{3}-\d{2}-\d{4}$", description="Will be encrypted at rest"
     )
+    emergency_contact: Optional[Dict[str, Any]] = None
     address: Optional[Dict[str, Any]] = None
     phone: Optional[str] = Field(None, max_length=20)
     email: Optional[EmailStr] = None
@@ -33,7 +41,15 @@ class PatientUpdate(BaseModel):
     last_name: Optional[str] = Field(None, min_length=1, max_length=100)
     dob: Optional[date] = None
     gender: Optional[str] = Field(None, pattern=r"^(male|female|other|unknown)$")
+    sex_assigned_at_birth: Optional[str] = Field(None, pattern=r"^(male|female|unknown)$")
+    gender_identity: Optional[str] = Field(None, max_length=50)
+    sexual_orientation: Optional[str] = Field(None, max_length=50)
+    race: Optional[str] = Field(None, max_length=100)
+    ethnicity: Optional[str] = Field(None, max_length=100)
+    preferred_name: Optional[str] = Field(None, max_length=100)
+    preferred_language: Optional[str] = Field(None, max_length=35)
     ssn: Optional[str] = Field(None, pattern=r"^\d{3}-\d{2}-\d{4}$")
+    emergency_contact: Optional[Dict[str, Any]] = None
     address: Optional[Dict[str, Any]] = None
     phone: Optional[str] = Field(None, max_length=20)
     email: Optional[EmailStr] = None
@@ -53,6 +69,14 @@ class PatientResponse(BaseModel):
     last_name: str
     dob: date
     gender: str
+    sex_assigned_at_birth: Optional[str] = None
+    gender_identity: Optional[str] = None
+    sexual_orientation: Optional[str] = None
+    race: Optional[str] = None
+    ethnicity: Optional[str] = None
+    preferred_name: Optional[str] = None
+    preferred_language: Optional[str] = "en"
+    emergency_contact: Optional[Dict[str, Any]] = None
     address: Optional[Dict[str, Any]] = None
     phone: Optional[str] = None
     email: Optional[str] = None
@@ -60,6 +84,7 @@ class PatientResponse(BaseModel):
     active: bool
     created_at: datetime
     updated_at: datetime
+    version: int
 
 
 class PatientList(BaseModel):

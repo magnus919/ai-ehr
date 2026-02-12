@@ -9,6 +9,11 @@ import {
   Cog6ToothIcon,
   ChevronDoubleLeftIcon,
   ChevronDoubleRightIcon,
+  HeartIcon,
+  DocumentTextIcon,
+  ExclamationTriangleIcon,
+  BeakerIcon,
+  UserGroupIcon,
 } from '@heroicons/react/24/outline';
 import { useUIStore } from '@/store/uiStore';
 import { APP_NAME } from '@/utils/constants';
@@ -28,11 +33,16 @@ const navigation: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
   { name: 'Patients', href: '/patients', icon: UsersIcon },
   { name: 'Scheduling', href: '/scheduling', icon: CalendarDaysIcon },
+  { name: 'Vital Signs', href: '/vital-signs', icon: HeartIcon },
+  { name: 'Clinical Notes', href: '/clinical-notes', icon: DocumentTextIcon },
+  { name: 'Allergies', href: '/allergies', icon: ExclamationTriangleIcon },
+  { name: 'Immunizations', href: '/immunizations', icon: BeakerIcon },
   { name: 'Orders', href: '/orders', icon: ClipboardDocumentListIcon },
   { name: 'Reports', href: '/reports', icon: ChartBarIcon },
 ];
 
 const secondaryNavigation: NavItem[] = [
+  { name: 'User Management', href: '/users', icon: UserGroupIcon },
   { name: 'Admin', href: '/admin', icon: Cog6ToothIcon },
 ];
 

@@ -56,3 +56,5 @@ class OrderResponse(BaseModel):
     ordering_provider_id: Optional[UUID] = None
     notes: Optional[str] = None
     created_at: datetime
+    updated_at: datetime
+    version: int

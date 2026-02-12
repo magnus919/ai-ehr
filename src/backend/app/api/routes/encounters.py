@@ -113,6 +113,7 @@ async def create_encounter(
     enc = Encounter(
         id=uuid.uuid4(),
         tenant_id=tenant_id,
+        created_by=uuid.UUID(current_user.sub),
         **payload.model_dump(),
     )
     db.add(enc)
@@ -142,6 +143,7 @@ async def update_encounter(
 
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(enc, field, value)
+    enc.version += 1
     await db.flush()
 
     await record_audit(
@@ -198,6 +200,7 @@ async def create_observation(
         id=uuid.uuid4(),
         tenant_id=tenant_id,
         encounter_id=encounter_id,
+        created_by=uuid.UUID(current_user.sub),
         **payload.model_dump(exclude={"encounter_id"}),
     )
     db.add(obs)
@@ -257,6 +260,7 @@ async def create_condition(
         id=uuid.uuid4(),
         tenant_id=tenant_id,
         encounter_id=encounter_id,
+        created_by=uuid.UUID(current_user.sub),
         **payload.model_dump(exclude={"encounter_id"}),
     )
     db.add(cond)
@@ -295,6 +299,7 @@ async def create_medication_request(
         id=uuid.uuid4(),
         tenant_id=tenant_id,
         encounter_id=encounter_id,
+        created_by=uuid.UUID(current_user.sub),
         **payload.model_dump(exclude={"encounter_id"}),
     )
     db.add(med)

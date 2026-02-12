@@ -20,6 +20,11 @@ const PatientsPage = lazy(() => import('@/pages/PatientsPage'));
 const PatientDetailPage = lazy(() => import('@/pages/PatientDetailPage'));
 const SchedulingPage = lazy(() => import('@/pages/SchedulingPage'));
 const OrdersPage = lazy(() => import('@/pages/OrdersPage'));
+const VitalSignsPage = lazy(() => import('@/pages/VitalSignsPage'));
+const ClinicalNotesPage = lazy(() => import('@/pages/ClinicalNotesPage'));
+const AllergiesPage = lazy(() => import('@/pages/AllergiesPage'));
+const ImmunizationsPage = lazy(() => import('@/pages/ImmunizationsPage'));
+const UserManagementPage = lazy(() => import('@/pages/UserManagementPage'));
 
 // ---------------------------------------------------------------------------
 // App Component
@@ -66,6 +71,18 @@ export default function App() {
               {/* Scheduling */}
               <Route path="/scheduling" element={<SchedulingPage />} />
 
+              {/* Vital Signs */}
+              <Route path="/vital-signs" element={<VitalSignsPage />} />
+
+              {/* Clinical Notes */}
+              <Route path="/clinical-notes" element={<ClinicalNotesPage />} />
+
+              {/* Allergies */}
+              <Route path="/allergies" element={<AllergiesPage />} />
+
+              {/* Immunizations */}
+              <Route path="/immunizations" element={<ImmunizationsPage />} />
+
               {/* Orders */}
               <Route path="/orders" element={<OrdersPage />} />
               <Route
@@ -108,6 +125,9 @@ export default function App() {
                   </div>
                 }
               />
+
+              {/* User Management */}
+              <Route path="/users" element={<UserManagementPage />} />
 
               {/* Admin */}
               <Route

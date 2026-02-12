@@ -51,3 +51,5 @@ class ObservationResponse(BaseModel):
     status: str
     performer_id: Optional[UUID] = None
     created_at: datetime
+    updated_at: datetime
+    version: int

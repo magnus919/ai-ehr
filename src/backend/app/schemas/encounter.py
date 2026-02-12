@@ -58,3 +58,5 @@ class EncounterResponse(BaseModel):
     location: Optional[str] = None
     notes: Optional[str] = None
     created_at: datetime
+    updated_at: datetime
+    version: int

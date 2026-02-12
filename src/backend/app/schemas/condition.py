@@ -30,6 +30,22 @@ class ConditionCreate(BaseModel):
     recorder_id: Optional[UUID] = None
 
 
+class ConditionUpdate(BaseModel):
+    """Schema for updating a condition."""
+
+    clinical_status: Optional[str] = Field(
+        None,
+        pattern=r"^(active|recurrence|relapse|inactive|remission|resolved)$",
+    )
+    verification_status: Optional[str] = Field(
+        None,
+        pattern=r"^(unconfirmed|provisional|differential|confirmed|refuted)$",
+    )
+    onset_date: Optional[date] = None
+    abatement_date: Optional[date] = None
+    recorder_id: Optional[UUID] = None
+
+
 class ConditionResponse(BaseModel):
     """Schema returned for a single condition."""
 
@@ -48,3 +64,5 @@ class ConditionResponse(BaseModel):
     abatement_date: Optional[date] = None
     recorder_id: Optional[UUID] = None
     created_at: datetime
+    updated_at: datetime
+    version: int
