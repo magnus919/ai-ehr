@@ -10,11 +10,10 @@ Provides:
 
 from __future__ import annotations
 
-import asyncio
 import os
 import uuid
 from datetime import datetime, timezone
-from typing import AsyncGenerator, Generator
+from typing import AsyncGenerator
 
 import pytest
 import pytest_asyncio
@@ -43,19 +42,6 @@ os.environ.setdefault("LOG_LEVEL", "WARNING")
 
 from app.core.config import settings  # noqa: E402
 from app.core.database import Base, get_db, tenant_context  # noqa: E402
-
-# ---------------------------------------------------------------------------
-# Event-loop fixture (module-scoped so one loop serves all async tests)
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture(scope="session")
-def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
-    """Create a single event loop for the entire test session."""
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
-
 
 # ---------------------------------------------------------------------------
 # Database engine & session fixtures
@@ -156,31 +142,37 @@ def test_user_data() -> dict:
 @pytest_asyncio.fixture
 async def test_user(db_session: AsyncSession, test_user_data: dict) -> dict:
     """Create a test user in the database and return user data with ID."""
-    from app.services.auth_service import AuthService  # noqa: E402
+    from app.core.security import hash_password  # noqa: E402
+    from app.models.user import User  # noqa: E402
 
-    auth_service = AuthService(db_session)
-    user = await auth_service.create_user(
+    # Create user directly using the User model
+    user = User(
+        id=uuid.UUID(test_user_data["id"]),
+        tenant_id=uuid.UUID(test_user_data["tenant_id"]),
         email=test_user_data["email"],
-        password=test_user_data["password"],
+        hashed_password=hash_password(test_user_data["password"]),
         first_name=test_user_data["first_name"],
         last_name=test_user_data["last_name"],
         role=test_user_data["role"],
+        npi=test_user_data.get("npi"),
+        is_active=test_user_data["is_active"],
     )
+    db_session.add(user)
+    await db_session.flush()
+    await db_session.commit()
     return {**test_user_data, "id": str(user.id)}
 
 
 @pytest.fixture
 def auth_token(test_user_data: dict) -> str:
     """Generate a valid JWT access token for the test user."""
-    from app.services.auth_service import AuthService  # noqa: E402
+    from app.core.security import create_access_token  # noqa: E402
 
-    return AuthService.create_access_token(
-        subject=test_user_data["id"],
-        extra_claims={
-            "email": test_user_data["email"],
-            "role": test_user_data["role"],
-            "tenant_id": test_user_data["tenant_id"],
-        },
+    return create_access_token(
+        user_id=uuid.UUID(test_user_data["id"]),
+        tenant_id=uuid.UUID(test_user_data["tenant_id"]),
+        role=test_user_data["role"],
+        extra={"email": test_user_data["email"]},
     )
 
 

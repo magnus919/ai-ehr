@@ -2,6 +2,7 @@
 Unit tests for the Authentication Service.
 
 Tests cover:
+  - User registration
   - User login with credentials
   - JWT access/refresh token generation and validation
   - Password hashing and verification
@@ -11,10 +12,12 @@ Tests cover:
 from __future__ import annotations
 
 import time
+import uuid
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
+from fastapi import HTTPException
 
 
 class TestPasswordHashing:
@@ -22,38 +25,38 @@ class TestPasswordHashing:
 
     def test_hash_password_returns_different_from_plaintext(self):
         """Hashed password must differ from the plaintext input."""
-        from app.services.auth_service import AuthService
+        from app.core.security import hash_password
 
         plaintext = "SecureP@ss123!"
-        hashed = AuthService.hash_password(plaintext)
+        hashed = hash_password(plaintext)
 
         assert hashed != plaintext
         assert len(hashed) > 0
 
     def test_verify_password_correct(self):
         """Correct password passes verification."""
-        from app.services.auth_service import AuthService
+        from app.core.security import hash_password, verify_password
 
         plaintext = "SecureP@ss123!"
-        hashed = AuthService.hash_password(plaintext)
+        hashed = hash_password(plaintext)
 
-        assert AuthService.verify_password(plaintext, hashed) is True
+        assert verify_password(plaintext, hashed) is True
 
     def test_verify_password_incorrect(self):
         """Wrong password fails verification."""
-        from app.services.auth_service import AuthService
+        from app.core.security import hash_password, verify_password
 
-        hashed = AuthService.hash_password("CorrectPassword1!")
+        hashed = hash_password("CorrectPassword1!")
 
-        assert AuthService.verify_password("WrongPassword1!", hashed) is False
+        assert verify_password("WrongPassword1!", hashed) is False
 
     def test_hash_is_not_deterministic(self):
         """Two hashes of the same password should differ (random salt)."""
-        from app.services.auth_service import AuthService
+        from app.core.security import hash_password
 
         plaintext = "SecureP@ss123!"
-        hash1 = AuthService.hash_password(plaintext)
-        hash2 = AuthService.hash_password(plaintext)
+        hash1 = hash_password(plaintext)
+        hash2 = hash_password(plaintext)
 
         assert hash1 != hash2
 
@@ -63,11 +66,14 @@ class TestTokenGeneration:
 
     def test_create_access_token_contains_subject(self):
         """Access token payload includes the subject (user ID)."""
-        from app.services.auth_service import AuthService
+        from app.core.security import create_access_token
 
-        token = AuthService.create_access_token(
-            subject="user-123",
-            extra_claims={"role": "physician"},
+        user_id = uuid.uuid4()
+        tenant_id = uuid.uuid4()
+        token = create_access_token(
+            user_id=user_id,
+            tenant_id=tenant_id,
+            role="physician",
         )
 
         assert token is not None
@@ -76,209 +82,343 @@ class TestTokenGeneration:
 
     def test_decode_access_token_returns_claims(self):
         """Decoding a valid token returns the embedded claims."""
-        from app.services.auth_service import AuthService
+        from app.core.security import create_access_token, decode_token
 
-        token = AuthService.create_access_token(
-            subject="user-456",
-            extra_claims={"role": "nurse", "tenant_id": "tenant-001"},
+        user_id = uuid.uuid4()
+        tenant_id = uuid.uuid4()
+        token = create_access_token(
+            user_id=user_id,
+            tenant_id=tenant_id,
+            role="nurse",
         )
 
-        claims = AuthService.decode_token(token)
+        claims = decode_token(token)
 
-        assert claims["sub"] == "user-456"
+        assert claims["sub"] == str(user_id)
         assert claims["role"] == "nurse"
-        assert claims["tenant_id"] == "tenant-001"
+        assert claims["tenant_id"] == str(tenant_id)
 
     def test_expired_token_raises(self):
         """An expired token is rejected during decoding."""
-        from app.services.auth_service import AuthService
+        from app.core.security import decode_token
+        from app.core.config import settings
+        import jwt
 
-        token = AuthService.create_access_token(
-            subject="user-789",
-            expires_delta=timedelta(seconds=-1),  # Already expired
+        user_id = uuid.uuid4()
+        tenant_id = uuid.uuid4()
+        now = datetime.now(timezone.utc)
+
+        # Create an expired token manually
+        payload = {
+            "sub": str(user_id),
+            "tenant_id": str(tenant_id),
+            "role": "physician",
+            "exp": now - timedelta(seconds=1),
+            "iat": now - timedelta(seconds=60),
+            "type": "access",
+        }
+        expired_token = jwt.encode(
+            payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM
         )
 
-        with pytest.raises(Exception):  # JWTError or ExpiredSignatureError
-            AuthService.decode_token(token)
+        with pytest.raises(HTTPException) as exc_info:
+            decode_token(expired_token)
+        assert exc_info.value.status_code == 401
 
     def test_tampered_token_raises(self):
         """A token with a modified payload is rejected."""
-        from app.services.auth_service import AuthService
+        from app.core.security import create_access_token, decode_token
 
-        token = AuthService.create_access_token(subject="user-100")
+        user_id = uuid.uuid4()
+        tenant_id = uuid.uuid4()
+        token = create_access_token(
+            user_id=user_id, tenant_id=tenant_id, role="physician"
+        )
 
         # Corrupt the token
         parts = token.split(".")
         parts[1] = parts[1][:-4] + "XXXX"
         tampered = ".".join(parts)
 
-        with pytest.raises(Exception):
-            AuthService.decode_token(tampered)
+        with pytest.raises(HTTPException) as exc_info:
+            decode_token(tampered)
+        assert exc_info.value.status_code == 401
 
     def test_create_refresh_token_has_longer_expiry(self):
         """Refresh tokens have a longer expiry than access tokens."""
-        from app.services.auth_service import AuthService
+        from app.core.security import (
+            create_access_token,
+            create_refresh_token,
+            decode_token,
+        )
 
-        access = AuthService.create_access_token(subject="user-200")
-        refresh = AuthService.create_refresh_token(subject="user-200")
+        user_id = uuid.uuid4()
+        tenant_id = uuid.uuid4()
+        access = create_access_token(
+            user_id=user_id, tenant_id=tenant_id, role="physician"
+        )
+        refresh = create_refresh_token(user_id=user_id, tenant_id=tenant_id)
 
-        access_claims = AuthService.decode_token(access)
-        refresh_claims = AuthService.decode_token(refresh)
+        access_claims = decode_token(access)
+        refresh_claims = decode_token(refresh)
 
         assert refresh_claims["exp"] > access_claims["exp"]
 
     def test_token_includes_issued_at(self):
         """Tokens include an 'iat' (issued at) claim."""
-        from app.services.auth_service import AuthService
+        from app.core.security import create_access_token, decode_token
 
-        token = AuthService.create_access_token(subject="user-300")
-        claims = AuthService.decode_token(token)
+        user_id = uuid.uuid4()
+        tenant_id = uuid.uuid4()
+        token = create_access_token(
+            user_id=user_id, tenant_id=tenant_id, role="physician"
+        )
+        claims = decode_token(token)
 
         assert "iat" in claims
         assert claims["iat"] <= int(time.time()) + 5
 
 
-class TestLogin:
+class TestRegisterUser:
+    """Tests for user registration."""
+
+    @pytest.mark.asyncio
+    async def test_register_user_success(self):
+        """Valid registration creates a new user."""
+        from app.services.auth_service import register_user
+        from app.schemas.user import UserCreate
+
+        mock_session = AsyncMock()
+        mock_result = AsyncMock()
+        mock_result.scalar_one_or_none.return_value = None  # No duplicate user
+        mock_session.execute.return_value = mock_result
+
+        tenant_id = uuid.uuid4()
+        payload = UserCreate(
+            email="newuser@example.com",
+            password="SecureP@ss123!",
+            first_name="New",
+            last_name="User",
+            role="physician",
+        )
+
+        result = await register_user(mock_session, tenant_id, payload)
+
+        assert result.email == payload.email
+        assert result.first_name == payload.first_name
+        mock_session.add.assert_called_once()
+        mock_session.flush.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_register_user_duplicate_email(self):
+        """Registration with duplicate email raises error."""
+        from app.services.auth_service import register_user
+        from app.schemas.user import UserCreate
+        from app.models.user import User
+
+        mock_session = AsyncMock()
+        mock_result = AsyncMock()
+        mock_user = User(
+            id=uuid.uuid4(), email="existing@example.com", tenant_id=uuid.uuid4()
+        )
+        mock_result.scalar_one_or_none.return_value = mock_user  # Duplicate found
+        mock_session.execute.return_value = mock_result
+
+        tenant_id = uuid.uuid4()
+        payload = UserCreate(
+            email="existing@example.com",
+            password="SecureP@ss123!",
+            first_name="New",
+            last_name="User",
+            role="physician",
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await register_user(mock_session, tenant_id, payload)
+        assert exc_info.value.status_code == 409
+
+
+class TestAuthenticateUser:
     """Tests for the login flow."""
 
     @pytest.mark.asyncio
-    async def test_login_success(self):
-        """Valid credentials return user data and tokens."""
-        from app.services.auth_service import AuthService
+    async def test_authenticate_user_success(self):
+        """Valid credentials return tokens."""
+        from app.services.auth_service import authenticate_user
+        from app.schemas.user import LoginRequest
+        from app.models.user import User
+        from app.core.security import hash_password
 
-        mock_user = MagicMock()
-        mock_user.id = "user-login-001"
-        mock_user.email = "doctor@example.com"
-        mock_user.hashed_password = AuthService.hash_password("ValidPass1!")
-        mock_user.is_active = True
-        mock_user.role = "physician"
-        mock_user.mfa_enabled = False
+        mock_user = User(
+            id=uuid.uuid4(),
+            tenant_id=uuid.uuid4(),
+            email="doctor@example.com",
+            hashed_password=hash_password("ValidPass1!"),
+            is_active=True,
+            role="physician",
+            mfa_enabled=False,
+        )
 
         mock_session = AsyncMock()
         mock_result = AsyncMock()
         mock_result.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_result
 
-        service = AuthService(mock_session)
-        result = await service.authenticate(
-            email="doctor@example.com",
-            password="ValidPass1!",
-        )
+        payload = LoginRequest(email="doctor@example.com", password="ValidPass1!")
+        result = await authenticate_user(mock_session, payload)
 
-        assert result is not None
-        assert "access_token" in result
-        assert "refresh_token" in result
+        assert result.access_token is not None
+        assert result.refresh_token is not None
+        assert result.token_type == "bearer"
+        mock_session.flush.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_login_wrong_password_fails(self):
-        """Wrong password returns None (authentication failure)."""
-        from app.services.auth_service import AuthService
+    async def test_authenticate_user_wrong_password(self):
+        """Wrong password raises 401."""
+        from app.services.auth_service import authenticate_user
+        from app.schemas.user import LoginRequest
+        from app.models.user import User
+        from app.core.security import hash_password
 
-        mock_user = MagicMock()
-        mock_user.hashed_password = AuthService.hash_password("CorrectPass1!")
-        mock_user.is_active = True
+        mock_user = User(
+            id=uuid.uuid4(),
+            tenant_id=uuid.uuid4(),
+            email="doctor@example.com",
+            hashed_password=hash_password("CorrectPass1!"),
+            is_active=True,
+        )
 
         mock_session = AsyncMock()
         mock_result = AsyncMock()
         mock_result.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_result
 
-        service = AuthService(mock_session)
-        result = await service.authenticate(
-            email="doctor@example.com",
-            password="WrongPass1!",
-        )
-
-        assert result is None
+        payload = LoginRequest(email="doctor@example.com", password="WrongPass1!")
+        with pytest.raises(HTTPException) as exc_info:
+            await authenticate_user(mock_session, payload)
+        assert exc_info.value.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_login_nonexistent_user_fails(self):
-        """Login with a non-existent email returns None."""
-        from app.services.auth_service import AuthService
+    async def test_authenticate_user_not_found(self):
+        """Login with non-existent email raises 401."""
+        from app.services.auth_service import authenticate_user
+        from app.schemas.user import LoginRequest
 
         mock_session = AsyncMock()
         mock_result = AsyncMock()
         mock_result.scalar_one_or_none.return_value = None
         mock_session.execute.return_value = mock_result
 
-        service = AuthService(mock_session)
-        result = await service.authenticate(
-            email="nobody@example.com",
-            password="AnyPass1!",
-        )
-
-        assert result is None
+        payload = LoginRequest(email="nobody@example.com", password="AnyPass1!")
+        with pytest.raises(HTTPException) as exc_info:
+            await authenticate_user(mock_session, payload)
+        assert exc_info.value.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_login_inactive_user_fails(self):
-        """An inactive/disabled user cannot log in."""
-        from app.services.auth_service import AuthService
+    async def test_authenticate_user_inactive(self):
+        """Inactive user cannot log in."""
+        from app.services.auth_service import authenticate_user
+        from app.schemas.user import LoginRequest
+        from app.models.user import User
+        from app.core.security import hash_password
 
-        mock_user = MagicMock()
-        mock_user.hashed_password = AuthService.hash_password("ValidPass1!")
-        mock_user.is_active = False
+        mock_user = User(
+            id=uuid.uuid4(),
+            tenant_id=uuid.uuid4(),
+            email="disabled@example.com",
+            hashed_password=hash_password("ValidPass1!"),
+            is_active=False,
+        )
 
         mock_session = AsyncMock()
         mock_result = AsyncMock()
         mock_result.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_result
 
-        service = AuthService(mock_session)
-        result = await service.authenticate(
-            email="disabled@example.com",
-            password="ValidPass1!",
-        )
-
-        assert result is None
+        payload = LoginRequest(email="disabled@example.com", password="ValidPass1!")
+        with pytest.raises(HTTPException) as exc_info:
+            await authenticate_user(mock_session, payload)
+        assert exc_info.value.status_code == 401
 
 
 class TestMFA:
     """Tests for multi-factor authentication (TOTP)."""
 
-    def test_generate_mfa_secret(self):
+    @pytest.mark.asyncio
+    async def test_setup_mfa(self):
         """MFA setup returns a secret and provisioning URI."""
-        from app.services.auth_service import AuthService
+        from app.services.auth_service import setup_mfa
+        from app.models.user import User
 
-        secret, uri = AuthService.generate_mfa_secret("user@example.com")
+        mock_user = User(
+            id=uuid.uuid4(),
+            tenant_id=uuid.uuid4(),
+            email="user@example.com",
+        )
 
-        assert len(secret) == 32  # Base32-encoded TOTP secret
-        assert "otpauth://totp/" in uri
-        assert "OpenMedRecord" in uri
+        mock_session = AsyncMock()
+        mock_result = AsyncMock()
+        mock_result.scalar_one_or_none.return_value = mock_user
+        mock_session.execute.return_value = mock_result
 
-    def test_verify_mfa_valid_code(self):
-        """A valid TOTP code passes verification."""
+        result = await setup_mfa(mock_session, mock_user.id)
+
+        assert len(result.secret) == 32  # Base32-encoded TOTP secret
+        assert "otpauth://totp/" in result.provisioning_uri
+        assert "user@example.com" in result.provisioning_uri
+        mock_session.flush.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_verify_mfa_valid_code(self):
+        """A valid TOTP code passes verification and enables MFA."""
         import pyotp
+        from app.services.auth_service import verify_mfa
+        from app.models.user import User
 
-        from app.services.auth_service import AuthService
+        secret = pyotp.random_base32()
+        mock_user = User(
+            id=uuid.uuid4(),
+            tenant_id=uuid.uuid4(),
+            email="user@example.com",
+            mfa_secret=secret,
+            mfa_enabled=False,
+        )
 
-        secret, _ = AuthService.generate_mfa_secret("user@example.com")
+        mock_session = AsyncMock()
+        mock_result = AsyncMock()
+        mock_result.scalar_one_or_none.return_value = mock_user
+        mock_session.execute.return_value = mock_result
+
         totp = pyotp.TOTP(secret)
         valid_code = totp.now()
 
-        assert AuthService.verify_mfa_code(secret, valid_code) is True
+        result = await verify_mfa(mock_session, mock_user.id, valid_code)
 
-    def test_verify_mfa_invalid_code(self):
+        assert result is True
+        assert mock_user.mfa_enabled is True
+        mock_session.flush.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_verify_mfa_invalid_code(self):
         """An invalid TOTP code fails verification."""
-        from app.services.auth_service import AuthService
-
-        secret, _ = AuthService.generate_mfa_secret("user@example.com")
-
-        assert AuthService.verify_mfa_code(secret, "000000") is False
-
-    def test_verify_mfa_expired_code(self):
-        """A TOTP code from a previous time window is rejected (strict mode)."""
         import pyotp
+        from app.services.auth_service import verify_mfa
+        from app.models.user import User
 
-        from app.services.auth_service import AuthService
+        secret = pyotp.random_base32()
+        mock_user = User(
+            id=uuid.uuid4(),
+            tenant_id=uuid.uuid4(),
+            email="user@example.com",
+            mfa_secret=secret,
+            mfa_enabled=False,
+        )
 
-        secret, _ = AuthService.generate_mfa_secret("user@example.com")
-        totp = pyotp.TOTP(secret)
+        mock_session = AsyncMock()
+        mock_result = AsyncMock()
+        mock_result.scalar_one_or_none.return_value = mock_user
+        mock_session.execute.return_value = mock_result
 
-        # Generate a code from 60 seconds ago (2 windows back)
-        old_code = totp.at(datetime.now(timezone.utc) - timedelta(seconds=60))
-
-        # Should fail with valid_window=0 (strict)
-        result = AuthService.verify_mfa_code(secret, old_code, valid_window=0)
-        # The code may or may not be valid depending on timing; we just verify
-        # the function executes without error
-        assert isinstance(result, bool)
+        with pytest.raises(HTTPException) as exc_info:
+            await verify_mfa(mock_session, mock_user.id, "000000")
+        assert exc_info.value.status_code == 401
