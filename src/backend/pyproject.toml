@@ -34,7 +34,9 @@ filterwarnings = [
     "ignore::DeprecationWarning:pytest_asyncio.plugin",
     # Ignore pytest-asyncio deprecation warnings
     "ignore:The event_loop fixture provided by pytest-asyncio has been redefined:DeprecationWarning",
-    # passlib imports the deprecated 'crypt' module on Python 3.12+
+    # passlib and its deps (argon2-cffi, crypt) emit deprecation warnings on Python 3.12+
+    "ignore::DeprecationWarning:passlib",
+    "ignore::DeprecationWarning:argon2",
     "ignore:'crypt' is deprecated:DeprecationWarning",
 ]
 
