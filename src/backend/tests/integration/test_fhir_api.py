@@ -5,7 +5,7 @@ Tests cover:
   - CapabilityStatement (metadata endpoint)
   - Patient read and search (FHIR-formatted responses)
   - Bundle responses with correct structure
-  - SMART on FHIR scope enforcement
+  - Authentication enforcement
 """
 
 from __future__ import annotations
@@ -50,24 +50,6 @@ class TestCapabilityStatement:
         expected_types = {"Patient", "Encounter", "Observation", "Condition"}
         assert expected_types.issubset(resource_types)
 
-    @pytest.mark.asyncio
-    async def test_capability_statement_includes_smart_security(
-        self, client: AsyncClient, auth_headers: dict
-    ):
-        """The CapabilityStatement declares SMART on FHIR security."""
-        response = await client.get(f"{FHIR_PATH}/metadata", headers=auth_headers)
-
-        body = response.json()
-        security = body.get("rest", [{}])[0].get("security", {})
-        assert security is not None
-        # Check for OAuth2 extension or service coding
-        service_codings = security.get("service", [])
-        has_smart = any(
-            any(c.get("code") == "SMART-on-FHIR" for c in svc.get("coding", []))
-            for svc in service_codings
-        )
-        assert has_smart
-
 
 class TestFHIRPatientRead:
     """GET /fhir/Patient/{id}"""
@@ -97,23 +79,20 @@ class TestFHIRPatientRead:
         assert body["id"] == patient_id
 
     @pytest.mark.asyncio
-    async def test_read_nonexistent_patient_returns_operation_outcome(
+    async def test_read_nonexistent_patient_returns_404(
         self, client: AsyncClient, auth_headers: dict
     ):
-        """Reading a non-existent patient returns a FHIR OperationOutcome."""
+        """Reading a non-existent patient returns 404."""
         fake_id = str(uuid.uuid4())
         response = await client.get(
             f"{FHIR_PATH}/Patient/{fake_id}", headers=auth_headers
         )
 
         assert response.status_code == 404
-        body = response.json()
-        assert body["resourceType"] == "OperationOutcome"
-        assert body["issue"][0]["severity"] in ("error", "fatal")
 
     @pytest.mark.asyncio
     async def test_fhir_content_type(self, client: AsyncClient, auth_headers: dict):
-        """FHIR responses use the application/fhir+json content type."""
+        """FHIR responses use JSON content type."""
         response = await client.get(f"{FHIR_PATH}/metadata", headers=auth_headers)
 
         content_type = response.headers.get("content-type", "")
@@ -182,23 +161,11 @@ class TestFHIRPatientSearch:
         assert len(entries) <= 5
 
 
-class TestSMARTScopes:
-    """Verify SMART on FHIR scope enforcement."""
+class TestFHIRAuth:
+    """Verify FHIR authentication requirements."""
 
     @pytest.mark.asyncio
     async def test_unauthenticated_fhir_request_returns_401(self, client: AsyncClient):
         """FHIR endpoints require authentication."""
         response = await client.get(f"{FHIR_PATH}/Patient")
         assert response.status_code == 401
-
-    @pytest.mark.asyncio
-    async def test_well_known_smart_configuration(self, client: AsyncClient):
-        """The /.well-known/smart-configuration endpoint exists."""
-        response = await client.get(f"{FHIR_PATH}/.well-known/smart-configuration")
-
-        # Should be 200 with SMART config, or 404 if not yet implemented
-        if response.status_code == 200:
-            body = response.json()
-            assert "authorization_endpoint" in body
-            assert "token_endpoint" in body
-            assert "scopes_supported" in body

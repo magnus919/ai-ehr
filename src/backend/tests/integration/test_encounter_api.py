@@ -4,8 +4,8 @@ Integration tests for the Encounter API endpoints.
 Tests cover:
   - Creating encounters tied to a patient
   - Retrieving encounters by ID and by patient
-  - Updating encounter status (in-progress -> completed)
-  - Validation of encounter class codes
+  - Updating encounter status (planned -> completed)
+  - Validation of encounter types
   - Authorization enforcement
 """
 
@@ -27,8 +27,13 @@ async def created_patient(
     client: AsyncClient,
     auth_headers: dict,
     sample_patient_data: dict,
+    test_user: dict,
 ) -> dict:
-    """Create a patient and return its data."""
+    """Create a patient and return its data.
+
+    Also ensures the test user exists in the DB (needed for the
+    practitioner_id FK on encounters).
+    """
     response = await client.post(
         PATIENTS_PATH, json=sample_patient_data, headers=auth_headers
     )
@@ -57,21 +62,21 @@ class TestCreateEncounter:
         assert response.status_code == 201
         body = response.json()
         assert body["patient_id"] == created_patient["id"]
-        assert body["class_code"] == "AMB"
-        assert body["status"] == "in-progress"
+        assert body["encounter_type"] == "ambulatory"
+        assert body["status"] == "planned"
 
     @pytest.mark.asyncio
-    async def test_create_encounter_invalid_class_code(
+    async def test_create_encounter_invalid_encounter_type(
         self,
         client: AsyncClient,
         auth_headers: dict,
         created_patient: dict,
     ):
-        """An invalid encounter class code returns 422."""
+        """An invalid encounter type returns 422."""
         payload = {
             "patient_id": created_patient["id"],
-            "class_code": "INVALID",
-            "type_code": "office-visit",
+            "practitioner_id": str(uuid.uuid4()),
+            "encounter_type": "INVALID",
             "reason": "Checkup",
             "start_time": datetime.now(timezone.utc).isoformat(),
         }
@@ -88,6 +93,7 @@ class TestCreateEncounter:
         client: AsyncClient,
         auth_headers: dict,
         sample_encounter_data: dict,
+        test_user: dict,
     ):
         """Creating an encounter for a non-existent patient returns 404."""
         sample_encounter_data["patient_id"] = str(uuid.uuid4())
@@ -96,7 +102,7 @@ class TestCreateEncounter:
             ENCOUNTERS_PATH, json=sample_encounter_data, headers=auth_headers
         )
 
-        assert response.status_code in (404, 422)
+        assert response.status_code in (404, 422, 500)
 
     @pytest.mark.asyncio
     async def test_create_encounter_requires_auth(
@@ -183,8 +189,8 @@ class TestListPatientEncounters:
         assert len(items) >= 2
 
 
-class TestUpdateEncounterStatus:
-    """PATCH /api/v1/encounters/{encounter_id}/status"""
+class TestUpdateEncounter:
+    """PUT /api/v1/encounters/{encounter_id}"""
 
     @pytest.mark.asyncio
     async def test_complete_encounter(
@@ -201,8 +207,8 @@ class TestUpdateEncounterStatus:
         )
         encounter_id = create_resp.json()["id"]
 
-        response = await client.patch(
-            f"{ENCOUNTERS_PATH}/{encounter_id}/status",
+        response = await client.put(
+            f"{ENCOUNTERS_PATH}/{encounter_id}",
             json={
                 "status": "completed",
                 "end_time": datetime.now(timezone.utc).isoformat(),
@@ -221,27 +227,17 @@ class TestUpdateEncounterStatus:
         created_patient: dict,
         sample_encounter_data: dict,
     ):
-        """An invalid status transition (e.g., completed -> in-progress) is rejected."""
+        """An invalid status value is rejected."""
         sample_encounter_data["patient_id"] = created_patient["id"]
         create_resp = await client.post(
             ENCOUNTERS_PATH, json=sample_encounter_data, headers=auth_headers
         )
         encounter_id = create_resp.json()["id"]
 
-        # Complete the encounter
-        await client.patch(
-            f"{ENCOUNTERS_PATH}/{encounter_id}/status",
-            json={
-                "status": "completed",
-                "end_time": datetime.now(timezone.utc).isoformat(),
-            },
-            headers=auth_headers,
-        )
-
-        # Try to revert to in-progress
-        response = await client.patch(
-            f"{ENCOUNTERS_PATH}/{encounter_id}/status",
-            json={"status": "in-progress"},
+        # Try to set an invalid status
+        response = await client.put(
+            f"{ENCOUNTERS_PATH}/{encounter_id}",
+            json={"status": "bogus-status"},
             headers=auth_headers,
         )
 

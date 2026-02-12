@@ -26,6 +26,7 @@ from app.core.database import get_db
 from app.core.security import TokenPayload, get_current_user
 from app.models.condition import Condition
 from app.models.encounter import Encounter
+from app.models.patient import Patient
 from app.models.medication import MedicationRequest
 from app.models.observation import Observation
 from app.schemas.condition import ConditionCreate, ConditionResponse
@@ -120,6 +121,16 @@ async def create_encounter(
     db: AsyncSession = Depends(get_db),
 ) -> EncounterResponse:
     tenant_id = uuid.UUID(current_user.tenant_id)
+
+    # Verify referenced patient exists
+    patient_stmt = select(Patient).where(
+        Patient.id == payload.patient_id, Patient.tenant_id == tenant_id
+    )
+    if not (await db.execute(patient_stmt)).scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found"
+        )
+
     enc = Encounter(
         id=uuid.uuid4(),
         tenant_id=tenant_id,

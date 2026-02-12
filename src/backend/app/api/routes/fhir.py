@@ -14,7 +14,7 @@ All responses conform to the FHIR R4 JSON representation.
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -69,7 +69,7 @@ async def capability_statement() -> CapabilityStatement:
 
     return CapabilityStatement(
         status="active",
-        date=datetime.utcnow().date().isoformat(),
+        date=datetime.now(timezone.utc).date().isoformat(),
         kind="instance",
         software={"name": settings.APP_NAME, "version": settings.APP_VERSION},
         fhirVersion="4.0.1",

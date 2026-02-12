@@ -37,11 +37,8 @@ async def register_user(
 ) -> UserResponse:
     """Register a new user within a tenant."""
 
-    # Check for duplicate email
-    stmt = select(User).where(
-        User.tenant_id == tenant_id,
-        User.email == payload.email,
-    )
+    # Check for duplicate email (globally unique for login credential)
+    stmt = select(User).where(User.email == payload.email)
     result = await db.execute(stmt)
     if result.scalar_one_or_none():
         raise HTTPException(

@@ -91,6 +91,7 @@ async def get_patient(
     stmt = select(Patient).where(
         Patient.id == patient_id,
         Patient.tenant_id == tenant_id,
+        Patient.active.is_(True),
     )
     result = await db.execute(stmt)
     patient = result.scalar_one_or_none()

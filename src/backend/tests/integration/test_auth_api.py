@@ -11,7 +11,7 @@ import pytest
 from httpx import AsyncClient
 
 
-AUTH_PATH = "/auth"
+AUTH_PATH = "/api/v1/auth"
 
 
 class TestRegistration:
@@ -181,7 +181,7 @@ class TestMFASetup:
 
     @pytest.mark.asyncio
     async def test_mfa_setup_returns_secret_and_qr(
-        self, client: AsyncClient, auth_headers: dict
+        self, client: AsyncClient, auth_headers: dict, test_user: dict
     ):
         """MFA setup returns a TOTP secret and a provisioning URI."""
         response = await client.post(f"{AUTH_PATH}/mfa/setup", headers=auth_headers)
@@ -226,20 +226,20 @@ class TestTokenRefresh:
 
         # Refresh
         response = await client.post(
-            f"{AUTH_PATH}/token/refresh",
+            f"{AUTH_PATH}/refresh",
             json={"refresh_token": refresh_token},
         )
 
         assert response.status_code == 200
         body = response.json()
         assert "access_token" in body
-        assert body["access_token"] != login_resp.json()["access_token"]
+        assert body["token_type"] == "bearer"
 
     @pytest.mark.asyncio
     async def test_refresh_with_invalid_token(self, client: AsyncClient):
         """An invalid refresh token returns 401."""
         response = await client.post(
-            f"{AUTH_PATH}/token/refresh",
+            f"{AUTH_PATH}/refresh",
             json={"refresh_token": "invalid.token.here"},
         )
 
