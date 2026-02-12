@@ -297,13 +297,34 @@ jobs:
             src/backend/coverage-integration.xml
 
   # =========================================================================
+  # Check whether AWS credentials are configured (secrets are not available
+  # in job-level `if`, so we expose the check as a job output).
+  # =========================================================================
+  check-aws:
+    name: Check AWS Credentials
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    outputs:
+      has-aws: ${{ steps.check.outputs.has-aws }}
+    steps:
+      - id: check
+        env:
+          AWS_ROLE: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+        run: |
+          if [ -n "$AWS_ROLE" ]; then
+            echo "has-aws=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-aws=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # =========================================================================
   # Build Docker Images
   # =========================================================================
   build-images:
     name: Build & Push Images
     runs-on: ubuntu-latest
-    needs: [lint, security-scan, unit-tests]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && secrets.AWS_DEPLOY_ROLE_ARN != ''
+    needs: [lint, security-scan, unit-tests, check-aws]
+    if: needs.check-aws.outputs.has-aws == 'true'
     strategy:
       matrix:
         service: [api-gateway, auth-service, fhir-gateway]
@@ -368,8 +389,8 @@ jobs:
   deploy-staging:
     name: Deploy to Staging
     runs-on: ubuntu-latest
-    needs: [build-images, integration-tests]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && secrets.AWS_DEPLOY_ROLE_ARN != ''
+    needs: [build-images, integration-tests, check-aws]
+    if: needs.check-aws.outputs.has-aws == 'true'
     environment:
       name: staging
       url: https://staging.openmedrecord.health
@@ -444,8 +465,8 @@ jobs:
   e2e-tests:
     name: E2E Tests
     runs-on: ubuntu-latest
-    needs: [deploy-staging]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && secrets.AWS_DEPLOY_ROLE_ARN != ''
+    needs: [deploy-staging, check-aws]
+    if: needs.check-aws.outputs.has-aws == 'true'
     steps:
       - uses: actions/checkout@v4
 
