@@ -6,7 +6,6 @@ import {
 } from '@tanstack/react-query';
 import {
   immunizationsApi,
-  type Immunization,
   type ImmunizationCreate,
 } from '@/services/immunizations';
 import toast from 'react-hot-toast';

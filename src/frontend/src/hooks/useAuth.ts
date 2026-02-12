@@ -5,7 +5,6 @@ import { authService, isMFAChallenge } from '@/services/auth';
 import type { LoginCredentials } from '@/types';
 import toast from 'react-hot-toast';
 import { getErrorMessage } from '@/services/api';
-import { SESSION_TIMEOUT_MS } from '@/utils/constants';
 
 // -----------------------------------------------------------------------------
 // useAuth Hook

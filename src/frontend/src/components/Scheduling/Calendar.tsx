@@ -5,7 +5,6 @@ import {
   addDays,
   addWeeks,
   subWeeks,
-  isSameDay,
   parseISO,
   setHours,
   setMinutes,
@@ -16,13 +15,10 @@ import {
   ChevronRightIcon,
 } from '@heroicons/react/24/outline';
 import { clsx } from 'clsx';
-import { StatusBadge } from '@/components/Common/StatusBadge';
 import { LoadingSpinner } from '@/components/Common/LoadingSpinner';
 import { useAppointmentsForRange } from '@/hooks/useAppointments';
 import { formatTime } from '@/utils/formatters';
 import {
-  APPOINTMENT_STATUS_COLORS,
-  APPOINTMENT_STATUS_LABELS,
   APPOINTMENT_TYPE_LABELS,
 } from '@/utils/constants';
 import type { Appointment, UUID } from '@/types';

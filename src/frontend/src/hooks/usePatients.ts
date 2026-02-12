@@ -6,7 +6,6 @@ import {
 } from '@tanstack/react-query';
 import { patientService } from '@/services/patients';
 import type {
-  Patient,
   PatientCreateInput,
   PatientUpdateInput,
   PatientSearchParams,

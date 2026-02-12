@@ -6,7 +6,6 @@ import {
 } from '@tanstack/react-query';
 import {
   clinicalNotesApi,
-  type ClinicalNote,
   type ClinicalNoteCreate,
   type ClinicalNoteUpdate,
 } from '@/services/clinicalNotes';

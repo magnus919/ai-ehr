@@ -4,7 +4,7 @@ import {
   useQueryClient,
   keepPreviousData,
 } from '@tanstack/react-query';
-import { observationsApi, type Observation, type ObservationCreate } from '@/services/observations';
+import { observationsApi, type ObservationCreate } from '@/services/observations';
 import toast from 'react-hot-toast';
 import { getErrorMessage } from '@/services/api';
 

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { usePatientSearch } from '@/hooks/usePatients';
 import { formatNameLastFirst, formatDate, calculateAge } from '@/utils/formatters';
@@ -35,7 +35,7 @@ export function PatientSearch({
     showAutocomplete ? query : '',
   );
 
-  const patients = searchResults?.items ?? [];
+  const patients = useMemo(() => searchResults?.items ?? [], [searchResults]);
 
   // Close dropdown on outside click
   useEffect(() => {

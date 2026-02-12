@@ -15,7 +15,7 @@ import { LoadingSpinner } from '@/components/Common/LoadingSpinner';
 import { ErrorBoundary } from '@/components/Common/ErrorBoundary';
 import { useTodayAppointments } from '@/hooks/useAppointments';
 import { useAuthStore } from '@/store/authStore';
-import { formatTime, formatName } from '@/utils/formatters';
+import { formatTime } from '@/utils/formatters';
 import {
   APPOINTMENT_STATUS_LABELS,
   APPOINTMENT_STATUS_COLORS,

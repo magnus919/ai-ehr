@@ -24,7 +24,6 @@ import {
   formatName,
   formatDOBWithAge,
   formatPhone,
-  formatSSN,
   formatDate,
 } from '@/utils/formatters';
 import { GENDER_LABELS } from '@/utils/constants';

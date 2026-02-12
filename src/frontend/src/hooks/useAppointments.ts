@@ -6,7 +6,6 @@ import {
 } from '@tanstack/react-query';
 import { appointmentService } from '@/services/appointments';
 import type {
-  Appointment,
   AppointmentCreateInput,
   AppointmentUpdateInput,
   AppointmentSearchParams,

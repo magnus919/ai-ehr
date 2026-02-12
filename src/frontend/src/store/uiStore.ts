@@ -81,7 +81,7 @@ function generateId(): string {
 export const useUIStore = create<UIStore>()(
   devtools(
     persist(
-      (set, get) => ({
+      (set) => ({
         // State
         sidebarCollapsed: false,
         sidebarMobileOpen: false,

@@ -2,11 +2,11 @@ import { useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { PlusIcon, XMarkIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { LoadingSpinner } from '@/components/Common/LoadingSpinner';
 import { useICD10Search } from '@/hooks/useEncounters';
 import { ENCOUNTER_CLASS_OPTIONS } from '@/utils/constants';
-import type { Encounter, EncounterClass } from '@/types';
+import type { Encounter } from '@/types';
 
 // -----------------------------------------------------------------------------
 // Validation Schema
@@ -62,6 +62,7 @@ interface DiagnosisEntry {
 
 export function EncounterForm({
   encounter,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   patientId,
   onSubmit,
   isLoading = false,

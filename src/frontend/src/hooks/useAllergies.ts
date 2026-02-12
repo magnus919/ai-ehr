@@ -6,7 +6,6 @@ import {
 } from '@tanstack/react-query';
 import {
   allergiesApi,
-  type AllergyIntolerance,
   type AllergyCreate,
   type AllergyUpdate,
 } from '@/services/allergies';

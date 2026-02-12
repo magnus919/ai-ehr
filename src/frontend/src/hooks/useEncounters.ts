@@ -6,12 +6,10 @@ import {
 } from '@tanstack/react-query';
 import { encounterService } from '@/services/encounters';
 import type {
-  Encounter,
   EncounterCreateInput,
   EncounterUpdateInput,
   UUID,
 } from '@/types';
-import type { ICD10Code } from '@/types/api';
 import toast from 'react-hot-toast';
 import { getErrorMessage } from '@/services/api';
 import { patientKeys } from './usePatients';

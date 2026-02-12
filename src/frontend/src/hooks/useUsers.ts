@@ -4,7 +4,7 @@ import {
   useQueryClient,
   keepPreviousData,
 } from '@tanstack/react-query';
-import { usersApi, type User, type UserUpdate } from '@/services/users';
+import { usersApi, type UserUpdate } from '@/services/users';
 import toast from 'react-hot-toast';
 import { getErrorMessage } from '@/services/api';
 
