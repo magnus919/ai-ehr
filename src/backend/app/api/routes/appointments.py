@@ -34,6 +34,7 @@ router = APIRouter(prefix="/appointments", tags=["Appointments"])
 
 # ── Helpers ──────────────────────────────────────────────────────────────
 
+
 async def _check_overlap(
     db: AsyncSession,
     tenant_id: uuid.UUID,
@@ -68,6 +69,7 @@ async def _check_overlap(
 
 # ── CRUD ─────────────────────────────────────────────────────────────────
 
+
 @router.get("", response_model=List[AppointmentResponse], summary="List appointments")
 async def list_appointments(
     page: int = Query(1, ge=1),
@@ -94,7 +96,11 @@ async def list_appointments(
     if to_date:
         stmt = stmt.where(Appointment.end_time <= to_date)
 
-    stmt = stmt.order_by(Appointment.start_time).offset((page - 1) * page_size).limit(page_size)
+    stmt = (
+        stmt.order_by(Appointment.start_time)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
     result = await db.execute(stmt)
     return [AppointmentResponse.model_validate(a) for a in result.scalars().all()]
 
@@ -120,13 +126,17 @@ async def check_availability(
     day_end = date.replace(hour=17, minute=0, second=0, microsecond=0)
 
     # Fetch booked appointments for that day
-    stmt = select(Appointment).where(
-        Appointment.tenant_id == tenant_id,
-        Appointment.practitioner_id == practitioner_id,
-        Appointment.status.in_(["proposed", "booked", "arrived"]),
-        Appointment.start_time >= day_start,
-        Appointment.end_time <= day_end,
-    ).order_by(Appointment.start_time)
+    stmt = (
+        select(Appointment)
+        .where(
+            Appointment.tenant_id == tenant_id,
+            Appointment.practitioner_id == practitioner_id,
+            Appointment.status.in_(["proposed", "booked", "arrived"]),
+            Appointment.start_time >= day_start,
+            Appointment.end_time <= day_end,
+        )
+        .order_by(Appointment.start_time)
+    )
     result = await db.execute(stmt)
     booked = result.scalars().all()
 
@@ -179,7 +189,9 @@ async def get_appointment(
     result = await db.execute(stmt)
     appt = result.scalar_one_or_none()
     if not appt:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found"
+        )
 
     await record_audit(
         db,
@@ -250,7 +262,9 @@ async def update_appointment(
     result = await db.execute(stmt)
     appt = result.scalar_one_or_none()
     if not appt:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found"
+        )
 
     update_data = payload.model_dump(exclude_unset=True)
 
@@ -259,7 +273,11 @@ async def update_appointment(
     new_end = update_data.get("end_time", appt.end_time)
     if "start_time" in update_data or "end_time" in update_data:
         await _check_overlap(
-            db, tenant_id, appt.practitioner_id, new_start, new_end,
+            db,
+            tenant_id,
+            appt.practitioner_id,
+            new_start,
+            new_end,
             exclude_id=appointment_id,
         )
 
@@ -297,7 +315,9 @@ async def cancel_appointment(
     result = await db.execute(stmt)
     appt = result.scalar_one_or_none()
     if not appt:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found"
+        )
 
     appt.status = "cancelled"
     await db.flush()

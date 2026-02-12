@@ -11,7 +11,6 @@ from __future__ import annotations
 import uuid
 
 import pytest
-import pytest_asyncio
 from httpx import AsyncClient
 
 
@@ -43,9 +42,7 @@ class TestCreatePatient:
     ):
         """Omitting required fields returns 422 with validation details."""
         incomplete = {"first_name": "Incomplete"}
-        response = await client.post(
-            BASE_PATH, json=incomplete, headers=auth_headers
-        )
+        response = await client.post(BASE_PATH, json=incomplete, headers=auth_headers)
 
         assert response.status_code == 422
         body = response.json()
@@ -88,9 +85,7 @@ class TestGetPatient:
         patient_id = create_resp.json()["id"]
 
         # Retrieve
-        response = await client.get(
-            f"{BASE_PATH}/{patient_id}", headers=auth_headers
-        )
+        response = await client.get(f"{BASE_PATH}/{patient_id}", headers=auth_headers)
 
         assert response.status_code == 200
         body = response.json()
@@ -103,9 +98,7 @@ class TestGetPatient:
     ):
         """Requesting a non-existent patient returns 404."""
         fake_id = str(uuid.uuid4())
-        response = await client.get(
-            f"{BASE_PATH}/{fake_id}", headers=auth_headers
-        )
+        response = await client.get(f"{BASE_PATH}/{fake_id}", headers=auth_headers)
 
         assert response.status_code == 404
 
@@ -114,9 +107,7 @@ class TestGetPatient:
         self, client: AsyncClient, auth_headers: dict
     ):
         """An invalid UUID format returns 422."""
-        response = await client.get(
-            f"{BASE_PATH}/not-a-uuid", headers=auth_headers
-        )
+        response = await client.get(f"{BASE_PATH}/not-a-uuid", headers=auth_headers)
 
         assert response.status_code in (400, 422)
 
@@ -168,9 +159,7 @@ class TestSearchPatients:
     ):
         """Searching by last name returns matching patients."""
         # Create a patient first
-        await client.post(
-            BASE_PATH, json=sample_patient_data, headers=auth_headers
-        )
+        await client.post(BASE_PATH, json=sample_patient_data, headers=auth_headers)
 
         response = await client.get(
             BASE_PATH,
@@ -205,9 +194,7 @@ class TestSearchPatients:
             assert "total" in body or "items" in body
 
     @pytest.mark.asyncio
-    async def test_search_no_results(
-        self, client: AsyncClient, auth_headers: dict
-    ):
+    async def test_search_no_results(self, client: AsyncClient, auth_headers: dict):
         """Searching for a non-existent name returns an empty result set."""
         response = await client.get(
             BASE_PATH,
@@ -247,7 +234,5 @@ class TestDeletePatient:
         assert response.status_code in (200, 204)
 
         # Verify the patient is no longer retrievable
-        get_resp = await client.get(
-            f"{BASE_PATH}/{patient_id}", headers=auth_headers
-        )
+        get_resp = await client.get(f"{BASE_PATH}/{patient_id}", headers=auth_headers)
         assert get_resp.status_code in (404, 410)

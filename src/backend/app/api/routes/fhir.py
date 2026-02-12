@@ -47,7 +47,10 @@ def _base_url(request: Request) -> str:
 
 # ── CapabilityStatement ──────────────────────────────────────────────────
 
-@router.get("/metadata", response_model=CapabilityStatement, summary="FHIR CapabilityStatement")
+
+@router.get(
+    "/metadata", response_model=CapabilityStatement, summary="FHIR CapabilityStatement"
+)
 async def capability_statement() -> CapabilityStatement:
     """Return the server's FHIR CapabilityStatement (no auth required)."""
 
@@ -109,6 +112,7 @@ def _search_params_for(resource_type: str) -> list[dict]:
 
 # ── Patient ──────────────────────────────────────────────────────────────
 
+
 @router.get("/Patient", summary="Search patients (FHIR)")
 async def search_patients(
     request: Request,
@@ -124,7 +128,9 @@ async def search_patients(
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     tenant_id = uuid.UUID(current_user.tenant_id)
-    stmt = select(Patient).where(Patient.tenant_id == tenant_id, Patient.active.is_(True))
+    stmt = select(Patient).where(
+        Patient.tenant_id == tenant_id, Patient.active.is_(True)
+    )
 
     if name:
         term = f"%{name.lower()}%"
@@ -152,7 +158,12 @@ async def search_patients(
 
     fhir_patients = [patient_to_fhir(p) for p in patients]
     bundle = build_bundle(
-        fhir_patients, total, "Patient", _base_url(request), page=_offset, page_size=_count
+        fhir_patients,
+        total,
+        "Patient",
+        _base_url(request),
+        page=_offset,
+        page_size=_count,
     )
 
     await record_audit(
@@ -174,11 +185,15 @@ async def read_patient(
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     tenant_id = uuid.UUID(current_user.tenant_id)
-    stmt = select(Patient).where(Patient.id == patient_id, Patient.tenant_id == tenant_id)
+    stmt = select(Patient).where(
+        Patient.id == patient_id, Patient.tenant_id == tenant_id
+    )
     result = await db.execute(stmt)
     patient = result.scalar_one_or_none()
     if not patient:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found"
+        )
 
     await record_audit(
         db,
@@ -193,6 +208,7 @@ async def read_patient(
 
 
 # ── Observation ──────────────────────────────────────────────────────────
+
 
 @router.get("/Observation", summary="Search observations (FHIR)")
 async def search_observations(
@@ -227,12 +243,18 @@ async def search_observations(
 
     fhir_obs = [observation_to_fhir(o) for o in observations]
     bundle = build_bundle(
-        fhir_obs, total, "Observation", _base_url(request), page=_offset, page_size=_count
+        fhir_obs,
+        total,
+        "Observation",
+        _base_url(request),
+        page=_offset,
+        page_size=_count,
     )
     return bundle.model_dump(exclude_none=True)
 
 
 # ── Condition ────────────────────────────────────────────────────────────
+
 
 @router.get("/Condition", summary="Search conditions (FHIR)")
 async def search_conditions(
@@ -264,12 +286,18 @@ async def search_conditions(
 
     fhir_conds = [condition_to_fhir(c) for c in conditions]
     bundle = build_bundle(
-        fhir_conds, total, "Condition", _base_url(request), page=_offset, page_size=_count
+        fhir_conds,
+        total,
+        "Condition",
+        _base_url(request),
+        page=_offset,
+        page_size=_count,
     )
     return bundle.model_dump(exclude_none=True)
 
 
 # ── Encounter ────────────────────────────────────────────────────────────
+
 
 @router.get("/Encounter", summary="Search encounters (FHIR)")
 async def search_encounters(
@@ -301,6 +329,11 @@ async def search_encounters(
 
     fhir_encs = [encounter_to_fhir(e) for e in encounters]
     bundle = build_bundle(
-        fhir_encs, total, "Encounter", _base_url(request), page=_offset, page_size=_count
+        fhir_encs,
+        total,
+        "Encounter",
+        _base_url(request),
+        page=_offset,
+        page_size=_count,
     )
     return bundle.model_dump(exclude_none=True)

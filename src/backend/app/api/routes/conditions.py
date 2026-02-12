@@ -40,13 +40,19 @@ async def list_conditions(
         stmt = stmt.where(Condition.patient_id == patient_id)
     if clinical_status:
         stmt = stmt.where(Condition.clinical_status == clinical_status)
-    stmt = stmt.order_by(Condition.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+    stmt = (
+        stmt.order_by(Condition.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
 
     result = await db.execute(stmt)
     return [ConditionResponse.model_validate(c) for c in result.scalars().all()]
 
 
-@router.get("/{condition_id}", response_model=ConditionResponse, summary="Get condition")
+@router.get(
+    "/{condition_id}", response_model=ConditionResponse, summary="Get condition"
+)
 async def get_condition(
     condition_id: uuid.UUID,
     current_user: TokenPayload = Depends(get_current_user),
@@ -60,7 +66,9 @@ async def get_condition(
     result = await db.execute(stmt)
     cond = result.scalar_one_or_none()
     if not cond:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condition not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Condition not found"
+        )
 
     await record_audit(
         db,
@@ -126,7 +134,9 @@ async def update_condition(
     result = await db.execute(stmt)
     cond = result.scalar_one_or_none()
     if not cond:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condition not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Condition not found"
+        )
 
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(cond, field, value)

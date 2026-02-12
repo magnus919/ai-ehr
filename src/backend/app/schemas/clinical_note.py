@@ -16,7 +16,9 @@ class ClinicalNoteCreate(BaseModel):
         ...,
         pattern=r"^(progress|soap|h_and_p|discharge|procedure|consultation)$",
     )
-    content: str = Field(..., min_length=1, description="Plain text content (will be encrypted at rest)")
+    content: str = Field(
+        ..., min_length=1, description="Plain text content (will be encrypted at rest)"
+    )
     is_psychotherapy_note: bool = False
     is_42cfr_part2: bool = False
 
@@ -31,6 +33,7 @@ class ClinicalNoteUpdate(BaseModel):
 
 class ClinicalNoteSign(BaseModel):
     """Request to sign a clinical note."""
+
     pass
 
 

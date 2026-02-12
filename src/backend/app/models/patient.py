@@ -24,9 +24,7 @@ if TYPE_CHECKING:
 class Patient(Base):
     __tablename__ = "patients"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     tenant_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, index=True)
     mrn: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -41,7 +39,9 @@ class Patient(Base):
     race: Mapped[str | None] = mapped_column(String(100), nullable=True)
     ethnicity: Mapped[str | None] = mapped_column(String(100), nullable=True)
     preferred_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    preferred_language: Mapped[str | None] = mapped_column(String(35), nullable=True, default="en")
+    preferred_language: Mapped[str | None] = mapped_column(
+        String(35), nullable=True, default="en"
+    )
     ssn_hmac: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     ssn_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     emergency_contact: Mapped[dict | None] = mapped_column(JSONB, nullable=True)

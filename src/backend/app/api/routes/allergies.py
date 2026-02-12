@@ -30,7 +30,9 @@ from app.schemas.allergy_intolerance import (
 router = APIRouter(prefix="/allergies", tags=["Allergies"])
 
 
-@router.get("", response_model=List[AllergyIntoleranceResponse], summary="List allergies")
+@router.get(
+    "", response_model=List[AllergyIntoleranceResponse], summary="List allergies"
+)
 async def list_allergies(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -45,13 +47,21 @@ async def list_allergies(
         stmt = stmt.where(AllergyIntolerance.patient_id == patient_id)
     if clinical_status:
         stmt = stmt.where(AllergyIntolerance.clinical_status == clinical_status)
-    stmt = stmt.order_by(AllergyIntolerance.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+    stmt = (
+        stmt.order_by(AllergyIntolerance.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
 
     result = await db.execute(stmt)
-    return [AllergyIntoleranceResponse.model_validate(a) for a in result.scalars().all()]
+    return [
+        AllergyIntoleranceResponse.model_validate(a) for a in result.scalars().all()
+    ]
 
 
-@router.get("/{allergy_id}", response_model=AllergyIntoleranceResponse, summary="Get allergy")
+@router.get(
+    "/{allergy_id}", response_model=AllergyIntoleranceResponse, summary="Get allergy"
+)
 async def get_allergy(
     allergy_id: uuid.UUID,
     current_user: TokenPayload = Depends(get_current_user),
@@ -65,7 +75,9 @@ async def get_allergy(
     result = await db.execute(stmt)
     allergy = result.scalar_one_or_none()
     if not allergy:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Allergy not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Allergy not found"
+        )
 
     await record_audit(
         db,
@@ -131,7 +143,9 @@ async def update_allergy(
     result = await db.execute(stmt)
     allergy = result.scalar_one_or_none()
     if not allergy:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Allergy not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Allergy not found"
+        )
 
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(allergy, field, value)
@@ -168,7 +182,9 @@ async def deactivate_allergy(
     result = await db.execute(stmt)
     allergy = result.scalar_one_or_none()
     if not allergy:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Allergy not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Allergy not found"
+        )
 
     allergy.clinical_status = "inactive"
     allergy.version += 1

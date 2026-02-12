@@ -19,9 +19,7 @@ if TYPE_CHECKING:
 class ClinicalNote(Base):
     __tablename__ = "clinical_notes"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     tenant_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, index=True)
     patient_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("patients.id"), nullable=False, index=True
@@ -38,16 +36,12 @@ class ClinicalNote(Base):
     author_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("users.id"), nullable=False
     )
-    content_encrypted: Mapped[bytes | None] = mapped_column(
-        LargeBinary, nullable=True
-    )
+    content_encrypted: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     is_psychotherapy_note: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False
     )
-    is_42cfr_part2: Mapped[bool] = mapped_column(
-        Boolean, default=False, nullable=False
-    )
+    is_42cfr_part2: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     signed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

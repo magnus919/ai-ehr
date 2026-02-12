@@ -19,7 +19,8 @@ class MedicationRequestCreate(BaseModel):
     dosage: Optional[str] = Field(None, max_length=200)
     frequency: Optional[str] = Field(None, max_length=100)
     route: Optional[str] = Field(
-        None, pattern=r"^(oral|IV|IM|subcutaneous|topical|inhalation|rectal|ophthalmic|otic|nasal|transdermal)$"
+        None,
+        pattern=r"^(oral|IV|IM|subcutaneous|topical|inhalation|rectal|ophthalmic|otic|nasal|transdermal)$",
     )
     status: str = Field(
         "active",

@@ -8,8 +8,7 @@ versa.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from app.models.condition import Condition
 from app.models.encounter import Encounter
@@ -37,12 +36,15 @@ from app.schemas.fhir import (
 
 # ── Patient ──────────────────────────────────────────────────────────────
 
+
 def patient_to_fhir(patient: Patient) -> FHIRPatient:
     """Convert an internal Patient model to a FHIR R4 Patient resource."""
 
     telecom: list[FHIRContactPoint] = []
     if patient.phone:
-        telecom.append(FHIRContactPoint(system="phone", value=patient.phone, use="home"))
+        telecom.append(
+            FHIRContactPoint(system="phone", value=patient.phone, use="home")
+        )
     if patient.email:
         telecom.append(FHIRContactPoint(system="email", value=patient.email))
 
@@ -62,7 +64,9 @@ def patient_to_fhir(patient: Patient) -> FHIRPatient:
 
     return FHIRPatient(
         id=str(patient.id),
-        identifier=[FHIRIdentifier(system="urn:oid:openmedrecord:mrn", value=patient.mrn)],
+        identifier=[
+            FHIRIdentifier(system="urn:oid:openmedrecord:mrn", value=patient.mrn)
+        ],
         active=patient.active,
         name=[
             FHIRHumanName(
@@ -121,6 +125,7 @@ def fhir_to_patient_data(fhir: FHIRPatient) -> Dict[str, Any]:
 
 # ── Observation ──────────────────────────────────────────────────────────
 
+
 def observation_to_fhir(obs: Observation) -> FHIRObservation:
     """Convert an internal Observation model to FHIR R4."""
 
@@ -142,7 +147,9 @@ def observation_to_fhir(obs: Observation) -> FHIRObservation:
         id=str(obs.id),
         status=obs.status,
         code=FHIRCodeableConcept(
-            coding=[FHIRCoding(system=obs.code_system, code=obs.code, display=obs.display)],
+            coding=[
+                FHIRCoding(system=obs.code_system, code=obs.code, display=obs.display)
+            ],
             text=obs.display,
         ),
         subject=subject_ref,
@@ -154,6 +161,7 @@ def observation_to_fhir(obs: Observation) -> FHIRObservation:
 
 
 # ── Condition ────────────────────────────────────────────────────────────
+
 
 def condition_to_fhir(cond: Condition) -> FHIRCondition:
     """Convert an internal Condition model to FHIR R4."""
@@ -178,7 +186,9 @@ def condition_to_fhir(cond: Condition) -> FHIRCondition:
         ),
         code=FHIRCodeableConcept(
             coding=[
-                FHIRCoding(system=cond.code_system, code=cond.code, display=cond.display)
+                FHIRCoding(
+                    system=cond.code_system, code=cond.code, display=cond.display
+                )
             ],
             text=cond.display,
         ),
@@ -194,6 +204,7 @@ def condition_to_fhir(cond: Condition) -> FHIRCondition:
 
 
 # ── Encounter ────────────────────────────────────────────────────────────
+
 
 def encounter_to_fhir(enc: Encounter) -> FHIREncounter:
     """Convert an internal Encounter model to FHIR R4."""
@@ -222,16 +233,13 @@ def encounter_to_fhir(enc: Encounter) -> FHIREncounter:
             }
         ],
         period=FHIRPeriod(start=enc.start_time, end=enc.end_time),
-        reasonCode=(
-            [FHIRCodeableConcept(text=enc.reason)] if enc.reason else []
-        ),
-        location=(
-            [{"location": {"display": enc.location}}] if enc.location else []
-        ),
+        reasonCode=([FHIRCodeableConcept(text=enc.reason)] if enc.reason else []),
+        location=([{"location": {"display": enc.location}}] if enc.location else []),
     )
 
 
 # ── Bundle helpers ───────────────────────────────────────────────────────
+
 
 def build_bundle(
     resources: List[Any],

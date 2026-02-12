@@ -20,9 +20,7 @@ from app.core.database import Base
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     tenant_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, index=True)
     user_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, index=True)
     action: Mapped[str] = mapped_column(

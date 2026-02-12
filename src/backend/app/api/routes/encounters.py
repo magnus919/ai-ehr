@@ -38,6 +38,7 @@ router = APIRouter(prefix="/encounters", tags=["Encounters"])
 
 # ── Helpers ──────────────────────────────────────────────────────────────
 
+
 async def _get_encounter(
     db: AsyncSession,
     tenant_id: uuid.UUID,
@@ -50,11 +51,14 @@ async def _get_encounter(
     result = await db.execute(stmt)
     enc = result.scalar_one_or_none()
     if not enc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Encounter not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Encounter not found"
+        )
     return enc
 
 
 # ── Encounter CRUD ───────────────────────────────────────────────────────
+
 
 @router.get("", response_model=List[EncounterResponse], summary="List encounters")
 async def list_encounters(
@@ -71,13 +75,19 @@ async def list_encounters(
         stmt = stmt.where(Encounter.patient_id == patient_id)
     if status_filter:
         stmt = stmt.where(Encounter.status == status_filter)
-    stmt = stmt.order_by(Encounter.start_time.desc()).offset((page - 1) * page_size).limit(page_size)
+    stmt = (
+        stmt.order_by(Encounter.start_time.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
 
     result = await db.execute(stmt)
     return [EncounterResponse.model_validate(e) for e in result.scalars().all()]
 
 
-@router.get("/{encounter_id}", response_model=EncounterResponse, summary="Get encounter")
+@router.get(
+    "/{encounter_id}", response_model=EncounterResponse, summary="Get encounter"
+)
 async def get_encounter(
     encounter_id: uuid.UUID,
     current_user: TokenPayload = Depends(get_current_user),
@@ -131,7 +141,9 @@ async def create_encounter(
     return EncounterResponse.model_validate(enc)
 
 
-@router.put("/{encounter_id}", response_model=EncounterResponse, summary="Update encounter")
+@router.put(
+    "/{encounter_id}", response_model=EncounterResponse, summary="Update encounter"
+)
 async def update_encounter(
     encounter_id: uuid.UUID,
     payload: EncounterUpdate,
@@ -159,6 +171,7 @@ async def update_encounter(
 
 
 # ── Nested: Observations ────────────────────────────────────────────────
+
 
 @router.get(
     "/{encounter_id}/observations",
@@ -220,6 +233,7 @@ async def create_observation(
 
 # ── Nested: Conditions ──────────────────────────────────────────────────
 
+
 @router.get(
     "/{encounter_id}/conditions",
     response_model=List[ConditionResponse],
@@ -279,6 +293,7 @@ async def create_condition(
 
 
 # ── Nested: Medications ─────────────────────────────────────────────────
+
 
 @router.post(
     "/{encounter_id}/medications",

@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import math
 import uuid
-from typing import List, Optional, Tuple
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, or_, select
@@ -19,7 +18,7 @@ from app.schemas.patient import (
     PatientResponse,
     PatientUpdate,
 )
-from app.utils.encryption import decrypt_value, encrypt_value
+from app.utils.encryption import encrypt_value
 
 
 async def create_patient(
@@ -122,9 +121,11 @@ async def list_patients(
     total = (await db.execute(count_stmt)).scalar() or 0
 
     # Page
-    stmt = base.order_by(Patient.last_name, Patient.first_name).offset(
-        (page - 1) * page_size
-    ).limit(page_size)
+    stmt = (
+        base.order_by(Patient.last_name, Patient.first_name)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
     result = await db.execute(stmt)
     patients = result.scalars().all()
 
@@ -222,9 +223,11 @@ async def search_patients(
     count_stmt = select(func.count()).select_from(base.subquery())
     total = (await db.execute(count_stmt)).scalar() or 0
 
-    stmt = base.order_by(Patient.last_name, Patient.first_name).offset(
-        (page - 1) * page_size
-    ).limit(page_size)
+    stmt = (
+        base.order_by(Patient.last_name, Patient.first_name)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
     result = await db.execute(stmt)
     patients = result.scalars().all()
 

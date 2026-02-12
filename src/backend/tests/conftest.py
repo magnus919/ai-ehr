@@ -35,7 +35,9 @@ os.environ.setdefault(
     "postgresql+asyncpg://openmed_test:openmed_test@localhost:5432/openmedrecord_test",
 )
 os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret-not-for-production")
-os.environ.setdefault("FIELD_ENCRYPTION_KEY", "dGVzdC1mZXJuZXQta2V5LW5vdC1mb3ItcHJvZA==")
+os.environ.setdefault(
+    "FIELD_ENCRYPTION_KEY", "dGVzdC1mZXJuZXQta2V5LW5vdC1mb3ItcHJvZA=="
+)
 os.environ.setdefault("REDIS_URL", "")
 os.environ.setdefault("LOG_LEVEL", "WARNING")
 
@@ -45,6 +47,7 @@ from app.core.database import Base, get_db, tenant_context  # noqa: E402
 # ---------------------------------------------------------------------------
 # Event-loop fixture (module-scoped so one loop serves all async tests)
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(scope="session")
 def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
@@ -105,6 +108,7 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 # ---------------------------------------------------------------------------
 # FastAPI test client
 # ---------------------------------------------------------------------------
+
 
 @pytest_asyncio.fixture
 async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
@@ -190,6 +194,7 @@ def auth_headers(auth_token: str) -> dict[str, str]:
 # Multi-tenancy
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def mock_tenant():
     """Set the tenant context for the duration of a test."""
@@ -201,6 +206,7 @@ def mock_tenant():
 # ---------------------------------------------------------------------------
 # Sample data factories
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def sample_patient_data() -> dict:
@@ -271,6 +277,7 @@ def sample_observation_data() -> dict:
 # ---------------------------------------------------------------------------
 # Cleanup fixture (for integration tests that need real DB writes)
 # ---------------------------------------------------------------------------
+
 
 @pytest_asyncio.fixture
 async def cleanup_tables(db_session: AsyncSession):

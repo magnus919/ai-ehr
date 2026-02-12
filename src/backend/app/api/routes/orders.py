@@ -45,7 +45,11 @@ async def list_orders(
         stmt = stmt.where(Order.order_type == order_type)
     if status_filter:
         stmt = stmt.where(Order.status == status_filter)
-    stmt = stmt.order_by(Order.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+    stmt = (
+        stmt.order_by(Order.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
 
     result = await db.execute(stmt)
     return [OrderResponse.model_validate(o) for o in result.scalars().all()]
@@ -62,7 +66,9 @@ async def get_order(
     result = await db.execute(stmt)
     order = result.scalar_one_or_none()
     if not order:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Order not found"
+        )
 
     await record_audit(
         db,
@@ -120,7 +126,9 @@ async def update_order(
     result = await db.execute(stmt)
     order = result.scalar_one_or_none()
     if not order:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Order not found"
+        )
 
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(order, field, value)
@@ -140,13 +148,16 @@ async def update_order(
 
 # ── Drug Interaction Check ───────────────────────────────────────────────
 
+
 class DrugInteractionRequest(OrderCreate):
     """Extends OrderCreate with a list of current medications for checking."""
+
     pass
 
 
 class DrugInteractionResult(OrderCreate):
     """Result of a drug interaction check."""
+
     pass
 
 
@@ -157,7 +168,9 @@ class DrugInteractionResult(OrderCreate):
 )
 async def drug_interaction_check(
     patient_id: uuid.UUID = Query(...),
-    medication_code: str = Query(..., description="Code of the new medication to check"),
+    medication_code: str = Query(
+        ..., description="Code of the new medication to check"
+    ),
     current_user: TokenPayload = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:

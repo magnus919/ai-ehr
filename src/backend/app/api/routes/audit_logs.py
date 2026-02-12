@@ -60,7 +60,11 @@ async def list_audit_logs(
     total = (await db.execute(count_stmt)).scalar() or 0
 
     # Fetch page
-    stmt = base.order_by(AuditLog.timestamp.desc()).offset((page - 1) * page_size).limit(page_size)
+    stmt = (
+        base.order_by(AuditLog.timestamp.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
     result = await db.execute(stmt)
     items = [AuditLogResponse.model_validate(a) for a in result.scalars().all()]
 

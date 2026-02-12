@@ -12,18 +12,14 @@ from pydantic import BaseModel, ConfigDict, Field
 class AllergyIntoleranceCreate(BaseModel):
     patient_id: UUID
     encounter_id: Optional[UUID] = None
-    clinical_status: str = Field(
-        "active", pattern=r"^(active|inactive|resolved)$"
-    )
+    clinical_status: str = Field("active", pattern=r"^(active|inactive|resolved)$")
     verification_status: str = Field(
         "confirmed",
         pattern=r"^(unconfirmed|presumed|confirmed|refuted|entered-in-error)$",
     )
     type: str = Field("allergy", pattern=r"^(allergy|intolerance)$")
     category: Optional[List[str]] = None
-    criticality: Optional[str] = Field(
-        None, pattern=r"^(low|high|unable-to-assess)$"
-    )
+    criticality: Optional[str] = Field(None, pattern=r"^(low|high|unable-to-assess)$")
     code_system: str = Field("SNOMED-CT", max_length=50)
     code: str = Field(..., max_length=20)
     code_display: str = Field(..., max_length=255)
@@ -41,9 +37,7 @@ class AllergyIntoleranceUpdate(BaseModel):
         None,
         pattern=r"^(unconfirmed|presumed|confirmed|refuted|entered-in-error)$",
     )
-    criticality: Optional[str] = Field(
-        None, pattern=r"^(low|high|unable-to-assess)$"
-    )
+    criticality: Optional[str] = Field(None, pattern=r"^(low|high|unable-to-assess)$")
     note: Optional[str] = None
     reaction: Optional[Dict[str, Any]] = None
 

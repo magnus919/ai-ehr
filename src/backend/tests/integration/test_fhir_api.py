@@ -27,9 +27,7 @@ class TestCapabilityStatement:
         self, client: AsyncClient, auth_headers: dict
     ):
         """The metadata endpoint returns a valid CapabilityStatement."""
-        response = await client.get(
-            f"{FHIR_PATH}/metadata", headers=auth_headers
-        )
+        response = await client.get(f"{FHIR_PATH}/metadata", headers=auth_headers)
 
         assert response.status_code == 200
         body = response.json()
@@ -42,9 +40,7 @@ class TestCapabilityStatement:
         self, client: AsyncClient, auth_headers: dict
     ):
         """The CapabilityStatement enumerates supported resource types."""
-        response = await client.get(
-            f"{FHIR_PATH}/metadata", headers=auth_headers
-        )
+        response = await client.get(f"{FHIR_PATH}/metadata", headers=auth_headers)
 
         body = response.json()
         rest = body.get("rest", [])
@@ -59,9 +55,7 @@ class TestCapabilityStatement:
         self, client: AsyncClient, auth_headers: dict
     ):
         """The CapabilityStatement declares SMART on FHIR security."""
-        response = await client.get(
-            f"{FHIR_PATH}/metadata", headers=auth_headers
-        )
+        response = await client.get(f"{FHIR_PATH}/metadata", headers=auth_headers)
 
         body = response.json()
         security = body.get("rest", [{}])[0].get("security", {})
@@ -69,10 +63,7 @@ class TestCapabilityStatement:
         # Check for OAuth2 extension or service coding
         service_codings = security.get("service", [])
         has_smart = any(
-            any(
-                c.get("code") == "SMART-on-FHIR"
-                for c in svc.get("coding", [])
-            )
+            any(c.get("code") == "SMART-on-FHIR" for c in svc.get("coding", []))
             for svc in service_codings
         )
         assert has_smart
@@ -121,25 +112,22 @@ class TestFHIRPatientRead:
         assert body["issue"][0]["severity"] in ("error", "fatal")
 
     @pytest.mark.asyncio
-    async def test_fhir_content_type(
-        self, client: AsyncClient, auth_headers: dict
-    ):
+    async def test_fhir_content_type(self, client: AsyncClient, auth_headers: dict):
         """FHIR responses use the application/fhir+json content type."""
-        response = await client.get(
-            f"{FHIR_PATH}/metadata", headers=auth_headers
-        )
+        response = await client.get(f"{FHIR_PATH}/metadata", headers=auth_headers)
 
         content_type = response.headers.get("content-type", "")
-        assert "application/fhir+json" in content_type or "application/json" in content_type
+        assert (
+            "application/fhir+json" in content_type
+            or "application/json" in content_type
+        )
 
 
 class TestFHIRPatientSearch:
     """GET /fhir/Patient?<params>"""
 
     @pytest.mark.asyncio
-    async def test_search_returns_bundle(
-        self, client: AsyncClient, auth_headers: dict
-    ):
+    async def test_search_returns_bundle(self, client: AsyncClient, auth_headers: dict):
         """Searching for patients returns a FHIR Bundle."""
         response = await client.get(
             f"{FHIR_PATH}/Patient",
@@ -198,17 +186,13 @@ class TestSMARTScopes:
     """Verify SMART on FHIR scope enforcement."""
 
     @pytest.mark.asyncio
-    async def test_unauthenticated_fhir_request_returns_401(
-        self, client: AsyncClient
-    ):
+    async def test_unauthenticated_fhir_request_returns_401(self, client: AsyncClient):
         """FHIR endpoints require authentication."""
         response = await client.get(f"{FHIR_PATH}/Patient")
         assert response.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_well_known_smart_configuration(
-        self, client: AsyncClient
-    ):
+    async def test_well_known_smart_configuration(self, client: AsyncClient):
         """The /.well-known/smart-configuration endpoint exists."""
         response = await client.get(f"{FHIR_PATH}/.well-known/smart-configuration")
 

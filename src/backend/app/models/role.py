@@ -4,7 +4,16 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Boolean, Column as Col, DateTime, ForeignKey, String, Table, Text, Uuid
+from sqlalchemy import (
+    Boolean,
+    Column as Col,
+    DateTime,
+    ForeignKey,
+    String,
+    Table,
+    Text,
+    Uuid,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -21,9 +30,7 @@ role_permissions = Table(
 class Role(Base):
     __tablename__ = "roles"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     tenant_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -52,9 +59,7 @@ class Role(Base):
 class Permission(Base):
     __tablename__ = "permissions"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     resource_type: Mapped[str] = mapped_column(String(100), nullable=False)
     operation: Mapped[str] = mapped_column(
         String(50), nullable=False

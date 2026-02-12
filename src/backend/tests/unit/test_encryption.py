@@ -21,6 +21,7 @@ import pytest
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _generate_fernet_key() -> str:
     """Generate a valid Fernet-compatible key for testing."""
     return base64.urlsafe_b64encode(os.urandom(32)).decode()
@@ -190,9 +191,7 @@ class TestKeyRotation:
         old_ciphertext = old_enc.encrypt(plaintext)
 
         # Rotate: decrypt with old key, encrypt with new key
-        rotated_ciphertext = FieldEncryption.rotate(
-            old_ciphertext, old_key, new_key
-        )
+        rotated_ciphertext = FieldEncryption.rotate(old_ciphertext, old_key, new_key)
 
         # Old key cannot decrypt the rotated ciphertext
         with pytest.raises(Exception):

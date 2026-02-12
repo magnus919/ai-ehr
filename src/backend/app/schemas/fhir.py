@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 
 # ── Shared datatypes ─────────────────────────────────────────────────────
 
+
 class FHIRCoding(BaseModel):
     system: Optional[str] = None
     code: Optional[str] = None
@@ -72,6 +73,7 @@ class FHIRQuantity(BaseModel):
 
 
 # ── Resources ────────────────────────────────────────────────────────────
+
 
 class FHIRPatient(BaseModel):
     resourceType: Literal["Patient"] = "Patient"

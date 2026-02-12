@@ -18,7 +18,12 @@ from app.schemas.fhir import (
 from app.schemas.medication import MedicationRequestCreate, MedicationRequestResponse
 from app.schemas.observation import ObservationCreate, ObservationResponse
 from app.schemas.order import OrderCreate, OrderResponse, OrderUpdate
-from app.schemas.patient import PatientCreate, PatientList, PatientResponse, PatientUpdate
+from app.schemas.patient import (
+    PatientCreate,
+    PatientList,
+    PatientResponse,
+    PatientUpdate,
+)
 from app.schemas.user import (
     LoginRequest,
     TokenResponse,

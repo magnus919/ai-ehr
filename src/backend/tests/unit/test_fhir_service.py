@@ -57,7 +57,11 @@ class TestPatientToFHIR:
 
         # Identifiers (MRN)
         mrn_identifier = next(
-            (i for i in fhir_patient["identifier"] if i["type"]["coding"][0]["code"] == "MR"),
+            (
+                i
+                for i in fhir_patient["identifier"]
+                if i["type"]["coding"][0]["code"] == "MR"
+            ),
             None,
         )
         assert mrn_identifier is not None
@@ -136,7 +140,14 @@ class TestFHIRToPatient:
             "birthDate": "1992-08-10",
             "identifier": [
                 {
-                    "type": {"coding": [{"system": "http://terminology.hl7.org/CodeSystem/v2-0203", "code": "MR"}]},
+                    "type": {
+                        "coding": [
+                            {
+                                "system": "http://terminology.hl7.org/CodeSystem/v2-0203",
+                                "code": "MR",
+                            }
+                        ]
+                    },
                     "value": "MRN-FHIR-001",
                 }
             ],

@@ -42,13 +42,19 @@ async def list_observations(
         stmt = stmt.where(Observation.code == code)
     if status_filter:
         stmt = stmt.where(Observation.status == status_filter)
-    stmt = stmt.order_by(Observation.effective_date.desc()).offset((page - 1) * page_size).limit(page_size)
+    stmt = (
+        stmt.order_by(Observation.effective_date.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
 
     result = await db.execute(stmt)
     return [ObservationResponse.model_validate(o) for o in result.scalars().all()]
 
 
-@router.get("/{observation_id}", response_model=ObservationResponse, summary="Get observation")
+@router.get(
+    "/{observation_id}", response_model=ObservationResponse, summary="Get observation"
+)
 async def get_observation(
     observation_id: uuid.UUID,
     current_user: TokenPayload = Depends(get_current_user),
@@ -62,7 +68,9 @@ async def get_observation(
     result = await db.execute(stmt)
     obs = result.scalar_one_or_none()
     if not obs:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Observation not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Observation not found"
+        )
 
     await record_audit(
         db,

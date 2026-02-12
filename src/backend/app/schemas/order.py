@@ -17,12 +17,8 @@ class OrderCreate(BaseModel):
     order_type: str = Field(..., pattern=r"^(lab|imaging|referral)$")
     code: str = Field(..., max_length=20)
     display: str = Field(..., max_length=255)
-    status: str = Field(
-        "active", pattern=r"^(draft|active|completed|cancelled)$"
-    )
-    priority: str = Field(
-        "routine", pattern=r"^(routine|urgent|stat|asap)$"
-    )
+    status: str = Field("active", pattern=r"^(draft|active|completed|cancelled)$")
+    priority: str = Field("routine", pattern=r"^(routine|urgent|stat|asap)$")
     ordering_provider_id: Optional[UUID] = None
     notes: Optional[str] = None
 
@@ -30,12 +26,8 @@ class OrderCreate(BaseModel):
 class OrderUpdate(BaseModel):
     """Schema for updating an order."""
 
-    status: Optional[str] = Field(
-        None, pattern=r"^(draft|active|completed|cancelled)$"
-    )
-    priority: Optional[str] = Field(
-        None, pattern=r"^(routine|urgent|stat|asap)$"
-    )
+    status: Optional[str] = Field(None, pattern=r"^(draft|active|completed|cancelled)$")
+    priority: Optional[str] = Field(None, pattern=r"^(routine|urgent|stat|asap)$")
     notes: Optional[str] = None
 
 

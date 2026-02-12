@@ -184,9 +184,7 @@ class TestMFASetup:
         self, client: AsyncClient, auth_headers: dict
     ):
         """MFA setup returns a TOTP secret and a provisioning URI."""
-        response = await client.post(
-            f"{AUTH_PATH}/mfa/setup", headers=auth_headers
-        )
+        response = await client.post(f"{AUTH_PATH}/mfa/setup", headers=auth_headers)
 
         assert response.status_code == 200
         body = response.json()
@@ -205,9 +203,7 @@ class TestTokenRefresh:
     """POST /auth/token/refresh"""
 
     @pytest.mark.asyncio
-    async def test_refresh_token_returns_new_access_token(
-        self, client: AsyncClient
-    ):
+    async def test_refresh_token_returns_new_access_token(self, client: AsyncClient):
         """A valid refresh token returns a new access token."""
         # Register and login
         email = "refresh.test@openmedrecord.health"

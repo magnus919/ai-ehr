@@ -17,9 +17,7 @@ class ObservationCreate(BaseModel):
     code: str = Field(..., max_length=20)
     code_system: str = Field("LOINC", max_length=50)
     display: str = Field(..., max_length=255)
-    value_type: str = Field(
-        "numeric", pattern=r"^(numeric|string|boolean|dateTime)$"
-    )
+    value_type: str = Field("numeric", pattern=r"^(numeric|string|boolean|dateTime)$")
     value_string: Optional[str] = None
     value_numeric: Optional[float] = None
     unit: Optional[str] = Field(None, max_length=50)

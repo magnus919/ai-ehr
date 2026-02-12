@@ -10,8 +10,7 @@ Verifies that:
 
 from __future__ import annotations
 
-import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 
 import pytest
 from httpx import AsyncClient
@@ -75,9 +74,7 @@ class TestPHIAccessAuditLogging:
         patient_id = create_resp.json()["id"]
 
         # Read
-        await client.get(
-            f"{PATIENTS_PATH}/{patient_id}", headers=auth_headers
-        )
+        await client.get(f"{PATIENTS_PATH}/{patient_id}", headers=auth_headers)
 
         # Check audit
         audit_resp = await client.get(
@@ -238,9 +235,7 @@ class TestAuditLogSearch:
     """Verify audit log search and filtering capabilities."""
 
     @pytest.mark.asyncio
-    async def test_filter_by_date_range(
-        self, client: AsyncClient, auth_headers: dict
-    ):
+    async def test_filter_by_date_range(self, client: AsyncClient, auth_headers: dict):
         """Audit logs can be filtered by date range."""
         response = await client.get(
             AUDIT_PATH,
@@ -254,9 +249,7 @@ class TestAuditLogSearch:
         assert response.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_filter_by_user(
-        self, client: AsyncClient, auth_headers: dict
-    ):
+    async def test_filter_by_user(self, client: AsyncClient, auth_headers: dict):
         """Audit logs can be filtered by user ID."""
         response = await client.get(
             AUDIT_PATH,

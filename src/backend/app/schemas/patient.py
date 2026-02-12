@@ -17,7 +17,9 @@ class PatientCreate(BaseModel):
     last_name: str = Field(..., min_length=1, max_length=100)
     dob: date
     gender: str = Field(..., pattern=r"^(male|female|other|unknown)$")
-    sex_assigned_at_birth: Optional[str] = Field(None, pattern=r"^(male|female|unknown)$")
+    sex_assigned_at_birth: Optional[str] = Field(
+        None, pattern=r"^(male|female|unknown)$"
+    )
     gender_identity: Optional[str] = Field(None, max_length=50)
     sexual_orientation: Optional[str] = Field(None, max_length=50)
     race: Optional[str] = Field(None, max_length=100)
@@ -41,7 +43,9 @@ class PatientUpdate(BaseModel):
     last_name: Optional[str] = Field(None, min_length=1, max_length=100)
     dob: Optional[date] = None
     gender: Optional[str] = Field(None, pattern=r"^(male|female|other|unknown)$")
-    sex_assigned_at_birth: Optional[str] = Field(None, pattern=r"^(male|female|unknown)$")
+    sex_assigned_at_birth: Optional[str] = Field(
+        None, pattern=r"^(male|female|unknown)$"
+    )
     gender_identity: Optional[str] = Field(None, max_length=50)
     sexual_orientation: Optional[str] = Field(None, max_length=50)
     race: Optional[str] = Field(None, max_length=100)

@@ -18,9 +18,7 @@ if TYPE_CHECKING:
 class Appointment(Base):
     __tablename__ = "appointments"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     tenant_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, index=True)
     patient_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("patients.id"), nullable=False, index=True
@@ -31,9 +29,7 @@ class Appointment(Base):
     start_time: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
-    end_time: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    end_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     status: Mapped[str] = mapped_column(
         String(30), nullable=False, default="booked"
     )  # proposed, booked, arrived, fulfilled, cancelled, noshow

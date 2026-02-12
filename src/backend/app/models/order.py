@@ -19,9 +19,7 @@ if TYPE_CHECKING:
 class Order(Base):
     __tablename__ = "orders"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     tenant_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, index=True)
     patient_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("patients.id"), nullable=False, index=True

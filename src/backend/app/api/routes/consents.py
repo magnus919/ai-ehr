@@ -45,7 +45,11 @@ async def list_consents(
         stmt = stmt.where(Consent.status == status_filter)
     if scope:
         stmt = stmt.where(Consent.scope == scope)
-    stmt = stmt.order_by(Consent.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+    stmt = (
+        stmt.order_by(Consent.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
 
     result = await db.execute(stmt)
     return [ConsentResponse.model_validate(c) for c in result.scalars().all()]
@@ -65,7 +69,9 @@ async def get_consent(
     result = await db.execute(stmt)
     consent = result.scalar_one_or_none()
     if not consent:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Consent not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Consent not found"
+        )
 
     await record_audit(
         db,
@@ -135,7 +141,9 @@ async def update_consent(
     result = await db.execute(stmt)
     consent = result.scalar_one_or_none()
     if not consent:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Consent not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Consent not found"
+        )
 
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(consent, field, value)
@@ -172,7 +180,9 @@ async def withdraw_consent(
     result = await db.execute(stmt)
     consent = result.scalar_one_or_none()
     if not consent:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Consent not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Consent not found"
+        )
 
     if consent.status == "inactive":
         raise HTTPException(

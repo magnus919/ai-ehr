@@ -60,7 +60,9 @@ def _decrypt_content(encrypted: bytes | None) -> str | None:
     return fernet.decrypt(encrypted).decode("utf-8")
 
 
-@router.get("", response_model=List[ClinicalNoteResponse], summary="List clinical notes")
+@router.get(
+    "", response_model=List[ClinicalNoteResponse], summary="List clinical notes"
+)
 async def list_clinical_notes(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -87,13 +89,19 @@ async def list_clinical_notes(
     if status_filter:
         stmt = stmt.where(ClinicalNote.status == status_filter)
 
-    stmt = stmt.order_by(ClinicalNote.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+    stmt = (
+        stmt.order_by(ClinicalNote.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
 
     result = await db.execute(stmt)
     return [ClinicalNoteResponse.model_validate(n) for n in result.scalars().all()]
 
 
-@router.get("/{note_id}", response_model=ClinicalNoteResponse, summary="Get clinical note")
+@router.get(
+    "/{note_id}", response_model=ClinicalNoteResponse, summary="Get clinical note"
+)
 async def get_clinical_note(
     note_id: uuid.UUID,
     current_user: TokenPayload = Depends(get_current_user),
@@ -107,10 +115,15 @@ async def get_clinical_note(
     result = await db.execute(stmt)
     note = result.scalar_one_or_none()
     if not note:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clinical note not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Clinical note not found"
+        )
 
     # Psychotherapy notes require special authorization (HIPAA 164.508(a)(2))
-    if note.is_psychotherapy_note and current_user.role not in _PSYCHOTHERAPY_AUTHORIZED_ROLES:
+    if (
+        note.is_psychotherapy_note
+        and current_user.role not in _PSYCHOTHERAPY_AUTHORIZED_ROLES
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Psychotherapy notes require specific authorization per HIPAA 164.508(a)(2)",
@@ -197,7 +210,9 @@ async def update_clinical_note(
     result = await db.execute(stmt)
     note = result.scalar_one_or_none()
     if not note:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clinical note not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Clinical note not found"
+        )
 
     if note.status == "signed":
         raise HTTPException(
@@ -248,7 +263,9 @@ async def sign_clinical_note(
     result = await db.execute(stmt)
     note = result.scalar_one_or_none()
     if not note:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clinical note not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Clinical note not found"
+        )
 
     if note.status == "signed":
         raise HTTPException(

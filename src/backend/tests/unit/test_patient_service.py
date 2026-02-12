@@ -155,9 +155,7 @@ class TestPatientServiceUpdate:
         mock_session.execute.return_value = mock_result
 
         service = PatientService(mock_session)
-        updated = await service.update_patient(
-            patient_id, {"phone": "+15559999999"}
-        )
+        updated = await service.update_patient(patient_id, {"phone": "+15559999999"})
 
         assert updated.phone == "+15559999999"
         # first_name should remain unchanged

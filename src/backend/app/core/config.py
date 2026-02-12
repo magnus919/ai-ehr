@@ -35,7 +35,9 @@ class Settings(BaseSettings):
     WORKERS: int = 4
 
     # ── Database ─────────────────────────────────────────────────────────
-    DATABASE_URL: str = "postgresql+asyncpg://openmed:openmed@localhost:5432/openmedrecord"
+    DATABASE_URL: str = (
+        "postgresql+asyncpg://openmed:openmed@localhost:5432/openmedrecord"
+    )
     DATABASE_POOL_SIZE: int = 20
     DATABASE_MAX_OVERFLOW: int = 10
     DATABASE_POOL_RECYCLE: int = 3600

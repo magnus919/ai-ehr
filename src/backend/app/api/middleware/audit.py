@@ -17,7 +17,11 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from app.core.config import settings
-from app.core.database import _validate_schema_name, async_session_factory, tenant_context
+from app.core.database import (
+    _validate_schema_name,
+    async_session_factory,
+    tenant_context,
+)
 from app.core.security import decode_token
 
 logger = logging.getLogger(__name__)
@@ -72,7 +76,9 @@ class AuditMiddleware(BaseHTTPMiddleware):
         try:
             await self._write_audit(request, response, path, elapsed_ms)
         except Exception:
-            logger.exception("Failed to write audit log entry for %s %s", request.method, path)
+            logger.exception(
+                "Failed to write audit log entry for %s %s", request.method, path
+            )
 
         return response
 

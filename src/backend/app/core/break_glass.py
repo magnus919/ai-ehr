@@ -78,7 +78,9 @@ async def activate_break_glass(
     return {
         "session_id": session_id,
         "expires_at": (now + timedelta(minutes=duration_minutes)).isoformat(),
-        "reauth_required_at": (now + timedelta(minutes=REAUTH_INTERVAL_MINUTES)).isoformat(),
+        "reauth_required_at": (
+            now + timedelta(minutes=REAUTH_INTERVAL_MINUTES)
+        ).isoformat(),
     }
 
 

@@ -44,13 +44,21 @@ async def list_immunizations(
         stmt = stmt.where(Immunization.patient_id == patient_id)
     if vaccine_code:
         stmt = stmt.where(Immunization.vaccine_code == vaccine_code)
-    stmt = stmt.order_by(Immunization.occurrence_datetime.desc()).offset((page - 1) * page_size).limit(page_size)
+    stmt = (
+        stmt.order_by(Immunization.occurrence_datetime.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
 
     result = await db.execute(stmt)
     return [ImmunizationResponse.model_validate(i) for i in result.scalars().all()]
 
 
-@router.get("/{immunization_id}", response_model=ImmunizationResponse, summary="Get immunization")
+@router.get(
+    "/{immunization_id}",
+    response_model=ImmunizationResponse,
+    summary="Get immunization",
+)
 async def get_immunization(
     immunization_id: uuid.UUID,
     current_user: TokenPayload = Depends(get_current_user),
@@ -64,7 +72,9 @@ async def get_immunization(
     result = await db.execute(stmt)
     imm = result.scalar_one_or_none()
     if not imm:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Immunization not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Immunization not found"
+        )
 
     await record_audit(
         db,
@@ -130,7 +140,9 @@ async def update_immunization(
     result = await db.execute(stmt)
     imm = result.scalar_one_or_none()
     if not imm:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Immunization not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Immunization not found"
+        )
 
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(imm, field, value)

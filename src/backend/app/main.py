@@ -39,6 +39,7 @@ from app.core.database import dispose_engine, init_db
 
 # ── Lifespan ─────────────────────────────────────────────────────────────
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown hooks."""
@@ -134,6 +135,7 @@ app.include_router(fhir.router)  # FHIR routes live at /fhir/*
 
 
 # ── Health check ─────────────────────────────────────────────────────────
+
 
 @app.get("/health", tags=["Infrastructure"], summary="Health check")
 async def health_check() -> dict:

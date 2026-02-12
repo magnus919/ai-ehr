@@ -25,7 +25,15 @@ from app.schemas.user import UserResponse, UserUpdate
 
 router = APIRouter(prefix="/users", tags=["User Management"])
 
-VALID_ROLES = {"admin", "practitioner", "nurse", "staff", "patient", "psychiatrist", "psychologist"}
+VALID_ROLES = {
+    "admin",
+    "practitioner",
+    "nurse",
+    "staff",
+    "patient",
+    "psychiatrist",
+    "psychologist",
+}
 
 
 @router.get(
@@ -48,7 +56,11 @@ async def list_users(
         stmt = stmt.where(User.is_active == is_active)
     if role:
         stmt = stmt.where(User.role == role)
-    stmt = stmt.order_by(User.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+    stmt = (
+        stmt.order_by(User.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
 
     result = await db.execute(stmt)
     return [UserResponse.model_validate(u) for u in result.scalars().all()]
@@ -77,7 +89,9 @@ async def get_user(
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
 
     return UserResponse.model_validate(user)
 
@@ -125,7 +139,9 @@ async def update_user(
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
 
     for field, value in update_data.items():
         setattr(user, field, value)

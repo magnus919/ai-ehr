@@ -10,8 +10,6 @@ Tests cover:
 
 from __future__ import annotations
 
-import pytest
-
 
 class TestNPIValidator:
     """Tests for NPI validation (10-digit Luhn algorithm)."""
@@ -141,12 +139,12 @@ class TestICD10Validator:
         from app.utils.validators import validate_icd10
 
         codes = [
-            "I10",       # Essential hypertension
-            "E78.5",     # Hyperlipidemia
-            "J44.1",     # COPD with acute exacerbation
-            "N18.3",     # CKD stage 3
-            "F32.1",     # Major depressive disorder, moderate
-            "Z23",       # Encounter for immunization
+            "I10",  # Essential hypertension
+            "E78.5",  # Hyperlipidemia
+            "J44.1",  # COPD with acute exacerbation
+            "N18.3",  # CKD stage 3
+            "F32.1",  # Major depressive disorder, moderate
+            "Z23",  # Encounter for immunization
         ]
         for code in codes:
             assert validate_icd10(code) is True, f"Expected ICD-10 {code} to be valid"
@@ -193,15 +191,15 @@ class TestLOINCValidator:
         from app.utils.validators import validate_loinc
 
         codes = [
-            "8480-6",    # Systolic blood pressure
-            "8462-4",    # Diastolic blood pressure
-            "8310-5",    # Body temperature
-            "29463-7",   # Body weight
-            "8302-2",    # Body height
-            "2093-3",    # Total cholesterol
-            "4548-4",    # Hemoglobin A1c
-            "718-7",     # Hemoglobin
-            "2345-7",    # Glucose
+            "8480-6",  # Systolic blood pressure
+            "8462-4",  # Diastolic blood pressure
+            "8310-5",  # Body temperature
+            "29463-7",  # Body weight
+            "8302-2",  # Body height
+            "2093-3",  # Total cholesterol
+            "4548-4",  # Hemoglobin A1c
+            "718-7",  # Hemoglobin
+            "2345-7",  # Glucose
         ]
         for code in codes:
             assert validate_loinc(code) is True, f"Expected LOINC {code} to be valid"
